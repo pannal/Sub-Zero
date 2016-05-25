@@ -3,12 +3,15 @@
 import logging
 import re
 import types
-
 from ignore import ignore_list
 from helpers import is_recent, format_item, query_plex
 from subzero import intent
+from lib import Plex
 from config import config
-from support.lib import Plex
+from subzero.constants import ICON
+
+# default thumb
+thumb=R(ICON)
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +28,7 @@ def get_kind(items):
     return items[0][MI_KIND]
 
 
-def getSectionSize(key):
+def get_section_size(key):
     """
     quick query to determine the section size
     :param key:
@@ -45,7 +48,7 @@ def getSectionSize(key):
     return size
 
 
-def getItems(key="recently_added", base="library", value=None, flat=False, add_section_title=False):
+def get_items(key="recently_added", base="library", value=None, flat=False, add_section_title=False):
     """
     try to handle all return types plex throws at us and return a generalized item tuple
     """
@@ -67,6 +70,10 @@ def getItems(key="recently_added", base="library", value=None, flat=False, add_s
         else:
             kind = item.type
 
+        if item.thumb:
+            thumb = item.thumb
+
+
         if kind == "season":
             # fixme: i think this case is unused now
             if flat:
@@ -82,8 +89,9 @@ def getItems(key="recently_added", base="library", value=None, flat=False, add_s
             items.append(("directory", item.title, item.key, True, item))
 
         elif kind == "section":
-            item.size = getSectionSize(item.key)
-            items.append(("section", item.title, int(item.key), True, item))
+            if item.type in ['movie', 'show']:
+                item.size = get_section_size(item.key)
+                items.append(("section", item.title, int(item.key), True, item))
 
         elif kind == "episode":
             items.append(
@@ -102,12 +110,12 @@ def getItems(key="recently_added", base="library", value=None, flat=False, add_s
     return items
 
 
-def getRecentlyAddedItems():
-    items = getItems(key="recently_added")
+def get_recently_added_items():
+    items = get_items(key="recently_added")
     return filter(lambda x: is_recent(x[MI_ITEM].added_at), items)
 
 
-def getRecentItems():
+def get_recent_items():
     """
     actually get the recent items, not limited like /library/recentlyAdded
     :return:
@@ -156,17 +164,22 @@ def getRecentItems():
     return recent
 
 
-def getOnDeckItems():
-    return getItems(key="on_deck", add_section_title=True)
+def get_on_deck_items():
+    return get_items(key="on_deck", add_section_title=True)
 
 
-def getAllItems(key, base="library", value=None, flat=False):
-    return getItems(key, base=base, value=value, flat=flat)
+def get_all_items(key, base="library", value=None, flat=False):
+    return get_items(key, base=base, value=value, flat=flat)
 
 
-def refreshItem(rating_key, force=False, timeout=8000):
+def refresh_item(rating_key, force=False, timeout=8000, refresh_kind=None, parent_rating_key=None):
     # timeout actually is the time for which the intent will be valid
     if force:
         intent.set("force", rating_key, timeout=timeout)
+
+    if refresh_kind == "episode":
+        # season refresh
+        rating_key = parent_rating_key
+
     Log.Info("%s item %s", "Refreshing" if not force else "Forced-refreshing", rating_key)
     Plex["library/metadata"].refresh(rating_key)
