@@ -40,13 +40,11 @@ def item_discover_missing_subs(rating_key, kind="show", added_at=None, section_t
             # all subs found
             Log.Info(u"All subtitles exist for '%s'", item_title)
             return
-
         missing = languages_set - set(existing_flat)
         Log.Info(u"Subs still missing for '%s': %s", item_title, missing)
 
     if missing:
-        return added_at, item_id, item_title
-
+        return added_at, item_id, item_title, item['thumb']
 
 def items_get_all_missing_subs(items):
     missing = []

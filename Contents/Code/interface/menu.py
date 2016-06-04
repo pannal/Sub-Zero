@@ -148,12 +148,13 @@ def RecentlyAddedMenu(message=None):
 def recentItemsMenu(title, base_title=None):
     oc = ObjectContainer(title2=title, no_cache=True, no_history=True)
     recent_items = get_recent_items()
+
     if recent_items:
         missing_items = items_get_all_missing_subs(recent_items)
         if missing_items:
-            for added_at, item_id, title in missing_items:
+            for added_at, item_id, title, thumb in missing_items:
                 oc.add(DirectoryObject(
-                    key=Callback(ItemDetailsMenu, title=base_title + " > " + title, item_title=title, thumb=thumb, rating_key=item_id), title=title
+                    key=Callback(ItemDetailsMenu, title=base_title + " > " + title, item_title=title, thumb=thumb, rating_key=item_id), title=title, thumb=thumb
                 ))
 
     return oc
@@ -174,10 +175,11 @@ def mergedItemsMenu(title, itemGetter, itemGetterKwArgs=None, base_title=None, *
     items = itemGetter(*args, **kwargs)
 
     for kind, title, item_id, deeper, item in items:
+        thumb = item['thumb']            
         oc.add(DirectoryObject(
             title=title,
             thumb=thumb,
-            key=Callback(ItemDetailsMenu, title=base_title + " > " + title, item_title=title, rating_key=item_id)
+            key=Callback(ItemDetailsMenu, thumb=thumb, title=base_title + " > " + title, item_title=title, rating_key=item_id)
         ))
 
     return oc
