@@ -273,6 +273,12 @@
     "default": "true"
   },
   {
+    "id": "provider.sabbz.enabled",
+    "label": "Provider: Enable subs.sab.bz",
+    "type": "bool",
+    "default": "true"
+  },
+  {
     "id": "provider.opensubtitles.use_tags",
     "label": "I keep the exact (release-) filename of my media files",
     "type": "bool",

@@ -12,21 +12,24 @@ subliminal.providers.Provider = PatchedProvider
 from subliminal.providers.addic7ed import Addic7edSubtitle, Addic7edProvider
 from subliminal.providers.podnapisi import PodnapisiSubtitle, PodnapisiProvider
 from subliminal.providers.tvsubtitles import TVsubtitlesSubtitle, TVsubtitlesProvider
+from subliminal.providers.sabbz import SabbzSubtitle, SabbzProvider
 from subliminal.providers.opensubtitles import OpenSubtitlesSubtitle, OpenSubtitlesProvider
 
 # add our patched base classes
 setattr(Addic7edSubtitle, "__bases__", (PatchedSubtitle,))
 setattr(PodnapisiSubtitle, "__bases__", (PatchedSubtitle,))
 setattr(TVsubtitlesSubtitle, "__bases__", (PatchedSubtitle,))
+setattr(SabbzSubtitle, "__bases__", (PatchedSubtitle,))
 setattr(OpenSubtitlesSubtitle, "__bases__", (PatchedSubtitle,))
 setattr(Addic7edProvider, "__bases__", (PatchedProvider,))
 setattr(PodnapisiProvider, "__bases__", (PatchedProvider,))
 setattr(TVsubtitlesProvider, "__bases__", (PatchedProvider,))
+setattr(SabbzProvider, "__bases__", (PatchedProvider,))
 setattr(OpenSubtitlesProvider, "__bases__", (PatchedProvider,))
 
 from .patch_provider_pool import PatchedProviderPool
 from .patch_video import patched_search_external_subtitles, scan_video
-from .patch_providers import addic7ed, podnapisi, tvsubtitles, opensubtitles
+from .patch_providers import addic7ed, podnapisi, tvsubtitles, sabbz, opensubtitles
 from .patch_api import save_subtitles, list_all_subtitles, download_subtitles
 
 # patch subliminal's ProviderPool
@@ -53,11 +56,13 @@ subliminal.subtitle.Subtitle.__repr__ = subtitleRepr
 subliminal.providers.addic7ed.Addic7edProvider = addic7ed.PatchedAddic7edProvider
 subliminal.providers.podnapisi.PodnapisiProvider = podnapisi.PatchedPodnapisiProvider
 subliminal.providers.tvsubtitles.TVsubtitlesProvider = tvsubtitles.PatchedTVsubtitlesProvider
+subliminal.providers.sabbz.SabbzProvider = sabbz.PatchedSabbzProvider
 subliminal.providers.opensubtitles.OpenSubtitlesProvider = opensubtitles.PatchedOpenSubtitlesProvider
 
 # add language converters
 babelfish.language_converters.register('addic7ed = subliminal_patch.patch_language:PatchedAddic7edConverter')
 babelfish.language_converters.register('tvsubtitles = subliminal.converters.tvsubtitles:TVsubtitlesConverter')
+babelfish.language_converters.register('sabbz = subliminal.converters.sabbz:SabbzConverter')
 
 # patch subliminal's external subtitles search algorithm
 subliminal.video.search_external_subtitles = patched_search_external_subtitles

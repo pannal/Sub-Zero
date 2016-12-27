@@ -222,13 +222,15 @@ class Config(object):
                      #'thesubdb': Prefs['provider.thesubdb.enabled'],
                      'podnapisi': cast_bool(Prefs['provider.podnapisi.enabled']),
                      'addic7ed': cast_bool(Prefs['provider.addic7ed.enabled']),
-                     'tvsubtitles': cast_bool(Prefs['provider.tvsubtitles.enabled'])
+                     'tvsubtitles': cast_bool(Prefs['provider.tvsubtitles.enabled']),
+                     'sabbz': cast_bool(Prefs['provider.sabbz.enabled'])
                      }
 
         # ditch non-forced-subtitles-reporting providers
         if cast_bool(Prefs['subtitles.only_foreign']):
             providers["addic7ed"] = False
             providers["tvsubtitles"] = False
+            providers["sabbz"] = False
 
         return filter(lambda prov: providers[prov], providers)
 
