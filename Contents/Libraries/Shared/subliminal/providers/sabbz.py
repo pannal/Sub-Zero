@@ -72,10 +72,32 @@ class SabbzProvider(Provider):
     ]}
     video_types = (Episode,)
     server_url = 'http://subs.sab.bz/'
+    
+    def __init__(self, username=None, password=None):
+        if username is not None and password is None or username is None and password is not None:
+            raise ConfigurationError('Username and password must be specified')
+
+        self.username = username
+        self.password = password
+        self.logged_in = False
 
     def initialize(self):
         self.session = Session()
         self.session.headers = {'User-Agent': 'Subliminal/%s' % get_version(__version__)}
+        logger.info('PACETO before login %r', self.session)
+        
+        # login
+        if self.username is not None and self.password is not None:
+            logger.info('Logging in')
+            data = {'UserName': self.username, 'PassWord': self.password, 'CookieDate': 1, 'submit': '1'}
+            r = self.session.post(self.server_url + 'forum/index.php?act=Login&CODE=01&return=http://subs.sab.bz', data, allow_redirects=False, timeout=10)
+
+            if r.status_code != 302:
+                logger.info('PACETO sabbz unable to login. Failed with status %r', r.status_code)
+                raise AuthenticationError(self.username)
+
+            logger.info('PACETO: sabbz Successfully Logged In Logged in %r' , self.session)
+            self.logged_in = True            
 
     def terminate(self):
         self.session.close()

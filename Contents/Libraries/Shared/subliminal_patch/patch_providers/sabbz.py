@@ -5,6 +5,7 @@ import logging
 from mixins import ProviderRetryMixin
 from mixins import PunctuationMixin
 import re
+from random import randint
 from subliminal.cache import SHOW_EXPIRATION_TIME
 from subliminal.cache import region
 from subliminal.providers import ParserBeautifulSoup
@@ -21,6 +22,24 @@ class PatchedSabbzSubtitle(SabbzSubtitle):
 
 
 class PatchedSabbzProvider(PunctuationMixin, ProviderRetryMixin, SabbzProvider):
+    USE_SABBZ_RANDOM_AGENTS = False
+    
+    def __init__(self, username=None, password=None, use_random_agents=False):
+        super(PatchedSabbzProvider, self).__init__(username=username, password=password)
+        self.USE_SABBZ_RANDOM_AGENTS = use_random_agents
+
+    def initialize(self):
+        # patch: add optional user agent randomization
+        super(PatchedSabbzProvider, self).initialize()
+        if self.USE_SABBZ_RANDOM_AGENTS:
+            from .utils import FIRST_THOUSAND_OR_SO_USER_AGENTS as AGENT_LIST
+            ua = AGENT_LIST[randint(0, len(AGENT_LIST) - 1)];
+            logger.info("sabbz: PACETO using random user agents - %s", ua)
+            self.session.headers = {
+                'User-Agent': ua,
+                'Referer': self.server_url,
+            }
+            
     @region.cache_on_arguments(expiration_time=SHOW_EXPIRATION_TIME)
     def search_show_id(self, series, year=None):
         """Search the show id from the `series` and `year`.
@@ -72,11 +91,11 @@ class PatchedSabbzProvider(PunctuationMixin, ProviderRetryMixin, SabbzProvider):
             rip = None
             release = None
             
-            logger.info('PACETO Dumps Language %r', language)
-            logger.info('PACETO Dumps subtitle_id  %r', subtitle_id)
-            logger.info('PACETO Dumps page_link  %r', page_link)
-            logger.info('PACETO Dumps rip  %r', rip)
-            logger.info('PACETO Dumps release  %r', release)
+            logger.debug('PACETO Dumps Language %r', language)
+            logger.debug('PACETO Dumps subtitle_id  %r', subtitle_id)
+            logger.debug('PACETO Dumps page_link  %r', page_link)
+            logger.debug('PACETO Dumps rip  %r', rip)
+            logger.debug('PACETO Dumps release  %r', release)
 
             subtitle = PatchedSabbzSubtitle(language, page_link, subtitle_id, series, season, episode, year, rip,
                                             release)
