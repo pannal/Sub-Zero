@@ -109,8 +109,8 @@ class PatchedSubtitle(Subtitle):
             # Eastern European Group 1
             encodings.append('windows-1250')
 
-        # Bulgarian, Serbian and Macedonian
-        elif self.language.alpha3 in ('bul', 'srb', 'mkd'):
+        # Bulgarian, Serbian and Macedonian Patched by PACETO
+        elif self.language.alpha3 in ('bul'):
             # Eastern European Group 2
             encodings.append('windows-1251')
         else:
