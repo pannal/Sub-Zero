@@ -155,6 +155,10 @@ class SubZeroAgent(object):
         results.Append(MetadataSearchResult(id='null', score=100))
 
     def update(self, metadata, media, lang):
+        if not config.enable_agent:
+            Log.Debug("Skipping Sub-Zero agent(s)")
+            return
+
         Log.Debug("Sub-Zero %s, %s update called" % (config.version, self.agent_type))
         intent = get_intent()
 

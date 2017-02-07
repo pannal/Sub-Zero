@@ -1,6 +1,7 @@
 # coding=utf-8
 import os
 import traceback
+import types
 import unicodedata
 import datetime
 import urllib
@@ -8,6 +9,10 @@ import time
 import re
 import platform
 import subprocess
+
+from bs4 import UnicodeDammit
+
+import chardet
 
 from babelfish import Language
 
@@ -47,6 +52,19 @@ def unicodize(s):
     except:
         Log('Couldn\'t strip control characters: ' + filename)
     return filename
+
+
+def force_unicode(s):
+    if not isinstance(s, types.UnicodeType):
+        try:
+            s = s.decode("utf-8")
+        except UnicodeDecodeError:
+            t = chardet.detect(s)
+            try:
+                s = s.decode(t["encoding"])
+            except UnicodeDecodeError:
+                s = UnicodeDammit(s).unicode_markup
+    return s
 
 
 def clean_filename(filename):

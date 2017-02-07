@@ -495,10 +495,40 @@
     "default": ""
   },
   {
-    "id": "enable_channel",
-    "label": "Enable Sub-Zero channel (disabling doesn't affect the subtitle features)?",
-    "type": "bool",
-    "default": "true"
+    "id": "plugin_mode",
+    "label": "Sub-Zero mode",
+    "type": "enum",
+    "values": [
+      "agent + channel",
+      "only agent",
+      "only channel"
+    ],
+    "default": "agent + channel"
+  },
+  {
+    "id": "plugin_pin",
+    "label": "Access PIN (any amount of numbers, 0-9)",
+    "type": "text",
+    "option": "hidden",
+    "default": "",
+    "secure": "true"
+  },
+  {
+    "id": "plugin_pin_valid_for",
+    "label": "Access PIN valid for minutes",
+    "type": "text",
+    "default": "10"
+  },
+  {
+    "id": "plugin_pin_mode",
+    "label": "Use PIN to restrict access to (needs plugin or PMS restart)",
+    "type": "enum",
+    "values": [
+      "disabled",
+      "channel menu",
+      "advanced menu"
+    ],
+    "default": "disabled"
   },
   {
     "id": "notify_executable",

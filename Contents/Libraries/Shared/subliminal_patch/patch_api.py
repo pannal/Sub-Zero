@@ -78,7 +78,7 @@ def get_subtitle_path(video_path, language=None, extension='.srt', forced_tag=Fa
 
 
 def save_subtitles(video, subtitles, single=False, directory=None, encoding=None, encode_with=None, chmod=None,
-                   forced_tag=False):
+                   forced_tag=False, path_decoder=None):
     """Save subtitles on filesystem.
 
     Subtitles are saved in the order of the list. If a subtitle with a language has already been saved, other subtitles
@@ -115,6 +115,9 @@ def save_subtitles(video, subtitles, single=False, directory=None, encoding=None
         subtitle_path = get_subtitle_path(video.name, None if single else subtitle.language, forced_tag=forced_tag)
         if directory is not None:
             subtitle_path = os.path.join(directory, os.path.split(subtitle_path)[1])
+
+        if path_decoder:
+            subtitle_path = path_decoder(subtitle_path)
 
         # force unicode
         subtitle_path = UnicodeDammit(subtitle_path).unicode_markup

@@ -9,11 +9,11 @@
         <key>CFBundleInfoDictionaryVersion</key>
         <string>6.0</string>
         <key>CFBundleShortVersionString</key>
-        <string>1.4.17</string>
+        <string>1.4.19</string>
         <key>CFBundleSignature</key>
         <string>????</string>
         <key>CFBundleVersion</key>
-        <string>1.4.17.836</string>
+        <string>1.4.19.866</string>
         <key>PlexFrameworkVersion</key>
         <string>2</string>
         <key>PlexPluginClass</key>
@@ -25,14 +25,14 @@
         <key>PlexPluginDevMode</key>
         <string>0</string>
          <key>PlexPluginCodePolicy</key>
-            <!-- this allows channels to access some python methods which are otherwise blocked, as well as import external code libraries, and interact with the PMS HTTP API -->     
+            <!-- this allows channels to access some python methods which are otherwise blocked, as well as import external code libraries, and interact with the PMS HTTP API -->
             <string>Elevated</string>
 	<key>PlexAgentAttributionText</key>
 	<string>&lt;div style=&quot;white-space: pre;&quot;&gt;&lt;img src=&quot;https://raw.githubusercontent.com/pannal/Sub-Zero.bundle/master/Contents/Resources/subzero.gif&quot; /&gt;
 
 &lt;h1&gt;Sub-Zero for Plex&lt;/h1&gt;&lt;i&gt;Subtitles done right&lt;/i&gt;
 
-Version 1.4.17.836
+Version 1.4.19.866
 
 Originally based on @bramwalet's awesome &lt;a href=&quot;https://github.com/bramwalet/Subliminal.bundle&quot;&gt;Subliminal.bundle&lt;/a&gt;
 

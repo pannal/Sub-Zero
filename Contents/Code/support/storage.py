@@ -9,7 +9,7 @@ import subliminal
 
 from subtitlehelpers import force_utf8
 from config import config
-from helpers import notify_executable, get_title_for_video_metadata, cast_bool
+from helpers import notify_executable, get_title_for_video_metadata, cast_bool, force_unicode
 
 
 def get_subtitle_info(rating_key):
@@ -72,35 +72,29 @@ def store_subtitle_info(scanned_video_part_map, downloaded_subtitles, storage_ty
         if video_id not in Dict["subs"]:
             Dict["subs"][video_id] = {}
 
-        video_dict = copy.deepcopy(Dict["subs"][video_id])
-
-        if part_id not in video_dict:
-            video_dict[part_id] = {}
+        if part_id not in Dict["subs"][video_id]:
+            Dict["subs"][video_id][part_id] = {}
 
         existing_parts.append(part_id)
 
-        part_dict = video_dict[part_id]
         for subtitle in video_subtitles:
             lang = Locale.Language.Match(subtitle.language.alpha2)
-            # always overwrite the old subtitle
-            part_dict[lang] = {}
 
-            lang_dict = part_dict[lang]
             sub_key = subtitle.provider_name, str(subtitle.id)
             metadata = video.plexapi_metadata
 
             # compute title
             title = get_title_for_video_metadata(metadata)
-            lang_dict[sub_key] = dict(score=subtitle.score, storage=storage_type, hash=Hash.MD5(subtitle.content),
-                                      date_added=datetime.datetime.now(), title=title, mode=mode)
-            lang_dict["current"] = sub_key
+            Dict["subs"][video_id][part_id][lang] = {
+                sub_key: dict(score=subtitle.score, storage=storage_type, hash=Hash.MD5(subtitle.content),
+                              date_added=datetime.datetime.now(), title=title, mode=mode),
+                "current": sub_key
+            }
 
-        Dict["subs"][video_id] = video_dict
+        Dict.Save()
 
     if existing_parts:
         whack_missing_parts(scanned_video_part_map, existing_parts=existing_parts)
-
-    Dict.Save()
 
 
 def reset_storage(key):
@@ -140,11 +134,12 @@ def save_subtitles_to_file(subtitles):
                     fld = os.path.join(fld_base, fld_custom)
             else:
                 fld = os.path.join(fld_base, Prefs["subtitles.save.subFolder"])
+            fld = force_unicode(fld)
             if not os.path.exists(fld):
                 os.makedirs(fld)
         subliminal.api.save_subtitles(video, video_subtitles, directory=fld, single=cast_bool(Prefs['subtitles.only_one']),
                                       encode_with=force_utf8 if config.enforce_encoding else None,
-                                      chmod=config.chmod, forced_tag=config.forced_only)
+                                      chmod=config.chmod, forced_tag=config.forced_only, path_decoder=force_unicode)
     return True
 
 

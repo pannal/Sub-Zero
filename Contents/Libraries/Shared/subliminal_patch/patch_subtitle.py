@@ -105,12 +105,14 @@ class PatchedSubtitle(Subtitle):
 
         # Polish, Czech, Slovak, Hungarian, Slovene, Bosnian, Croatian, Serbian (Latin script),
         # Romanian (before 1993 spelling reform) and Albanian
-        elif self.language.alpha3 in ('pol', 'cze', 'svk', 'hun', 'svn', 'bih', 'hrv', 'srb', 'rou', 'alb'):
+        elif self.language.alpha3 in ('pol', 'cze', 'ces', 'slk', 'slo', 'slv', 'hun', 'bos', 'hbs', 'hrv', 'rsb',
+                                      'ron', 'rum', 'sqi', 'alb'):
             # Eastern European Group 1
             encodings.append('windows-1250')
 
-        # Bulgarian, Serbian and Macedonian Patched by PACETO
-        elif self.language.alpha3 in ('bul'):
+        # Bulgarian, Serbian and Macedonian
+        elif self.language.alpha3 in ('bul', 'srp', 'mkd', 'mac'):
+
             # Eastern European Group 2
             encodings.append('windows-1251')
         else:

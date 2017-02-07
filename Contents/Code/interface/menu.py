@@ -1,10 +1,13 @@
 # coding=utf-8
 import logging
+
+import datetime
+
 import logger
 import os
 
 from menu_helpers import add_ignore_options, dig_tree, set_refresh_menu_state, \
-    should_display_ignore, enable_channel_wrapper, default_thumb, debounce, SZObjectContainer
+    should_display_ignore, enable_channel_wrapper, default_thumb, debounce, ObjectContainer, SubFolderObjectContainer
 from subzero.constants import TITLE, ART, ICON, PREFIX, PLUGIN_IDENTIFIER, DEPENDENCY_MODULE_NAMES
 from subzero.history_storage import mode_map
 from support.background import scheduler
@@ -47,6 +50,14 @@ def fatality(randomize=None, force_title=None, header=None, message=None, only_r
 
     # always re-check enabled sections
     config.refresh_enabled_sections()
+
+    if config.lock_menu and not config.pin_correct:
+        oc.add(DirectoryObject(
+            key=Callback(PinMenu, randomize=timestamp()),
+            title=pad_title("Enter PIN"),
+            summary="The owner has restricted the access to this menu. Please enter the correct pin",
+        ))
+        return oc
 
     if not config.permissions_ok and config.missing_permissions:
         for title, path in config.missing_permissions:
@@ -138,6 +149,14 @@ def fatality(randomize=None, force_title=None, header=None, message=None, only_r
         )
     ))
 
+    # add re-lock after pin unlock
+    if config.pin:
+        oc.add(DirectoryObject(
+            key=Callback(ClearPin, randomize=timestamp()),
+            title=pad_title("Re-lock menu(s)"),
+            summary="Enabled the PIN again for menu(s)"
+        ))
+
     if not only_refresh:
         oc.add(DirectoryObject(
             key=Callback(AdvancedMenu),
@@ -146,6 +165,38 @@ def fatality(randomize=None, force_title=None, header=None, message=None, only_r
         ))
 
     return oc
+
+
+@route(PREFIX + '/pin')
+def PinMenu(pin="", randomize=None, success_go_to="channel"):
+    oc = ObjectContainer(title2="Enter PIN number %s" % (len(pin) + 1), no_cache=True, no_history=True,
+                         skip_pin_lock=True)
+
+    if pin == config.pin:
+        Dict["pin_correct_time"] = datetime.datetime.now()
+        config.locked = False
+        if success_go_to == "channel":
+            return fatality(force_title="PIN correct", header="PIN correct", no_history=True)
+        elif success_go_to == "advanced":
+            return AdvancedMenu(randomize=timestamp())
+
+    for i in range(10):
+        oc.add(DirectoryObject(
+            key=Callback(PinMenu, randomize=timestamp(), pin=pin + str(i),success_go_to=success_go_to),
+            title=pad_title(str(i)),
+        ))
+    oc.add(DirectoryObject(
+        key=Callback(PinMenu, randomize=timestamp(),success_go_to=success_go_to),
+        title=pad_title("Reset"),
+    ))
+    return oc
+
+
+@route(PREFIX + '/pin_lock')
+def ClearPin(randomize=None):
+    Dict["pin_correct_time"] = None
+    config.locked = True
+    return fatality(force_title="Menu locked", header=" ", no_history=True)
 
 
 @route(PREFIX + '/on_deck')
@@ -172,7 +223,7 @@ def RecentlyAddedMenu(message=None):
 @debounce
 def RecentMissingSubtitlesMenu(force=False, randomize=None):
     title="Items with missing subtitles"
-    oc = SZObjectContainer(title2=title, no_cache=True, no_history=True)
+    oc = SubFolderObjectContainer(title2=title, no_cache=True, no_history=True)
 
     running = scheduler.is_task_running("MissingSubtitles")
     task_data = scheduler.get_task_data("MissingSubtitles")
@@ -220,7 +271,7 @@ def mergedItemsMenu(title, itemGetter, itemGetterKwArgs=None, base_title=None, *
     :param kwargs:
     :return:
     """
-    oc = SZObjectContainer(title2=title, no_cache=True, no_history=True)
+    oc = SubFolderObjectContainer(title2=title, no_cache=True, no_history=True)
     items = itemGetter(*args, **kwargs)
 
     for kind, title, item_id, deeper, item in items:
@@ -260,7 +311,7 @@ def IgnoreMenu(kind, rating_key, title=None, sure=False, todo="not_set"):
     """
     is_ignored = rating_key in ignore_list[kind]
     if not sure:
-        oc = SZObjectContainer(no_history=True, replace_parent=True, title1="%s %s %s %s the ignore list" % (
+        oc = SubFolderObjectContainer(no_history=True, replace_parent=True, title1="%s %s %s %s the ignore list" % (
             "Add" if not is_ignored else "Remove", ignore_list.verbose(kind), title, "to" if not is_ignored else "from"), title2="Are you sure?")
         oc.add(DirectoryObject(
             key=Callback(IgnoreMenu, kind=kind, rating_key=rating_key, title=title, sure=True, todo="add" if not is_ignored else "remove"),
@@ -305,7 +356,7 @@ def SectionsMenu(base_title="Sections", section_items_key="all", ignore_options=
     """
     items = get_all_items("sections")
 
-    return dig_tree(SZObjectContainer(title2="Sections", no_cache=True, no_history=True), items, None,
+    return dig_tree(SubFolderObjectContainer(title2="Sections", no_cache=True, no_history=True), items, None,
                     menu_determination_callback=determine_section_display, pass_kwargs={"base_title": base_title,
                                                                                         "section_items_key": section_items_key,
                                                                                         "ignore_options": ignore_options},
@@ -332,7 +383,7 @@ def SectionMenu(rating_key, title=None, base_title=None, section_title=None, ign
 
     section_title = title
     title = base_title + " > " + title
-    oc = SZObjectContainer(title2=title, no_cache=True, no_history=True)
+    oc = SubFolderObjectContainer(title2=title, no_cache=True, no_history=True)
     if ignore_options:
         add_ignore_options(oc, "sections", title=section_title, rating_key=rating_key, callback_menu=IgnoreMenu)
 
@@ -359,7 +410,7 @@ def SectionFirstLetterMenu(rating_key, title=None, base_title=None, section_titl
     kind, deeper = get_items_info(items)
 
     title = unicode(title)
-    oc = SZObjectContainer(title2=section_title, no_cache=True, no_history=True)
+    oc = SubFolderObjectContainer(title2=section_title, no_cache=True, no_history=True)
     title = base_title + " > " + title
     add_ignore_options(oc, "sections", title=section_title, rating_key=rating_key, callback_menu=IgnoreMenu)
 
@@ -384,7 +435,7 @@ def FirstLetterMetadataMenu(rating_key, key, title=None, base_title=None, displa
     :return:
     """
     title = base_title + " > " + unicode(title)
-    oc = SZObjectContainer(title2=title, no_cache=True, no_history=True)
+    oc = SubFolderObjectContainer(title2=title, no_cache=True, no_history=True)
 
     items = get_all_items(key="first_character", value=[rating_key, key], base="library/sections", flat=False)
     kind, deeper = get_items_info(items)
@@ -409,7 +460,7 @@ def MetadataMenu(rating_key, title=None, base_title=None, display_items=False, p
     title = unicode(title)
     item_title = title
     title = base_title + " > " + title
-    oc = SZObjectContainer(title2=title, no_cache=True, no_history=True)
+    oc = SubFolderObjectContainer(title2=title, no_cache=True, no_history=True)
 
     current_kind = get_item_kind_from_rating_key(rating_key)
 
@@ -450,7 +501,7 @@ def MetadataMenu(rating_key, title=None, base_title=None, display_items=False, p
 
 @route(PREFIX + '/ignore_list')
 def IgnoreListMenu():
-    oc = SZObjectContainer(title2="Ignore list", replace_parent=True)
+    oc = SubFolderObjectContainer(title2="Ignore list", replace_parent=True)
     for key in ignore_list.key_order:
         values = ignore_list[key]
         for value in values:
@@ -462,7 +513,7 @@ def IgnoreListMenu():
 def HistoryMenu():
     from support.history import get_history
     history = get_history()
-    oc = SZObjectContainer(title2="History", replace_parent=True)
+    oc = SubFolderObjectContainer(title2="History", replace_parent=True)
 
     for item in history.history_items:
         oc.add(DirectoryObject(
@@ -494,7 +545,7 @@ def ItemDetailsMenu(rating_key, title=None, base_title=None, item_title=None, ra
 
     timeout = 30
 
-    oc = SZObjectContainer(title2=title, replace_parent=True)
+    oc = SubFolderObjectContainer(title2=title, replace_parent=True)
     oc.add(DirectoryObject(
         key=Callback(RefreshItem, rating_key=rating_key, item_title=item_title, randomize=timestamp(),
                      timeout=timeout*1000),
@@ -587,7 +638,7 @@ def ListAvailableSubsForItemMenu(rating_key=None, part_id=None, title=None, item
                                 language=language)
         running = True
 
-    oc = SZObjectContainer(title2=unicode(title), replace_parent=True)
+    oc = SubFolderObjectContainer(title2=unicode(title), replace_parent=True)
     oc.add(DirectoryObject(
         key=Callback(ItemDetailsMenu, rating_key=rating_key, item_title=item_title, title=title, randomize=timestamp()),
         title=u"Back to: %s" % title,
@@ -693,8 +744,16 @@ def RefreshMissing(randomize=None):
 
 @route(PREFIX + '/advanced')
 def AdvancedMenu(randomize=None, header=None, message=None):
-    oc = SZObjectContainer(header=header or "Internal stuff, pay attention!", message=message, no_cache=True, no_history=True,
-                         replace_parent=False, title2="Advanced")
+    oc = SubFolderObjectContainer(header=header or "Internal stuff, pay attention!", message=message, no_cache=True, no_history=True,
+                                  replace_parent=False, title2="Advanced")
+
+    if config.lock_advanced_menu and not config.pin_correct:
+        oc.add(DirectoryObject(
+            key=Callback(PinMenu, randomize=timestamp(), success_go_to="advanced"),
+            title=pad_title("Enter PIN"),
+            summary="The owner has restricted the access to this menu. Please enter the correct pin",
+        ))
+        return oc
 
     oc.add(DirectoryObject(
         key=Callback(TriggerRestart, randomize=timestamp()),
@@ -747,22 +806,26 @@ def ValidatePrefs():
     # cache the channel state
     update_dict = False
     restart = False
+
+    # reset pin
+    Dict["pin_correct_time"] = None
+
+    config.initialize()
     if "channel_enabled" not in Dict:
         update_dict = True
 
-    elif Dict["channel_enabled"] != Prefs["enable_channel"]:
-        Log.Debug("Channel features %s, restarting plugin", "enabled" if Prefs["enable_channel"] else "disabled")
+    elif Dict["channel_enabled"] != config.enable_channel:
+        Log.Debug("Channel features %s, restarting plugin", "enabled" if config.enable_channel else "disabled")
         update_dict = True
         restart = True
 
     if update_dict:
-        Dict["channel_enabled"] = Prefs["enable_channel"]
+        Dict["channel_enabled"] = config.enable_channel
         Dict.Save()
 
     if restart:
         DispatchRestart()
 
-    config.initialize()
     scheduler.setup_tasks()
     set_refresh_menu_state(None)
 
@@ -801,7 +864,7 @@ def Restart():
 @route(PREFIX + '/storage/reset', sure=bool)
 def ResetStorage(key, randomize=None, sure=False):
     if not sure:
-        oc = SZObjectContainer(no_history=True, title1="Reset subtitle storage", title2="Are you sure?")
+        oc = SubFolderObjectContainer(no_history=True, title1="Reset subtitle storage", title2="Are you sure?")
         oc.add(DirectoryObject(
             key=Callback(ResetStorage, key=key, sure=True, randomize=timestamp()),
             title=pad_title("Are you really sure?"),
