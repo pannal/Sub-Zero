@@ -58,6 +58,7 @@ subliminal.providers.opensubtitles.OpenSubtitlesProvider = opensubtitles.Patched
 # add language converters
 babelfish.language_converters.register('addic7ed = subliminal_patch.patch_language:PatchedAddic7edConverter')
 babelfish.language_converters.register('tvsubtitles = subliminal.converters.tvsubtitles:TVsubtitlesConverter')
+babelfish.language_converters.register('legendastv = subliminal.converters.legendastv:LegendasTVConverter')
 
 # patch subliminal's external subtitles search algorithm
 subliminal.video.search_external_subtitles = patched_search_external_subtitles
