@@ -268,7 +268,8 @@ def notify_executable(exe_info, videos, subtitles, storage):
             except subprocess.CalledProcessError:
                 Log.Error(u"Calling %s failed: %s" % (exe, traceback.format_exc()))
             else:
-                Log.Debug(u"Process output: %s" % output)
+				Log.Debug(u"Process output: %s" % output.decode('cp1252').encode('utf-8'))
+                # Old: Log.Debug(u"Process output: %s" % output)
 				# For Windows: Log.Debug(u"Process output: %s" % output.decode('cp1252').encode('utf-8'))
 
 
