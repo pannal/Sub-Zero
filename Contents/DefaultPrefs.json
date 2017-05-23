@@ -211,6 +211,32 @@
     "secure": "true"
   },
   {
+    "id": "provider.legendastv.enabled",
+    "label": "Provider: Enable Legendas.TV",
+    "type": "bool",
+    "default": "true"
+  },
+  {
+    "id": "provider.legendastv.username",
+    "label": "Legendas.TV Username",
+    "type": "text",
+    "default": ""
+  },
+  {
+    "id": "provider.legendastv.password",
+    "label": "Legendas.TV Password",
+    "type": "text",
+    "option": "hidden",
+    "default": "",
+    "secure": "true"
+  },
+  {
+    "id": "provider.legendastv.epScore",
+    "label": "Minimum score for Legendas.TV subtitles to download from TV archives (see http://v.ht/szscores)",
+    "type": "text",
+    "default": "116"
+  },  
+  {
     "id": "provider.podnapisi.enabled",
     "label": "Provider: Enable Podnapisi.NET",
     "type": "bool",

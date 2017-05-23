@@ -314,7 +314,8 @@ class Config(object):
                      # 'thesubdb': Prefs['provider.thesubdb.enabled'],
                      'podnapisi': cast_bool(Prefs['provider.podnapisi.enabled']),
                      'addic7ed': cast_bool(Prefs['provider.addic7ed.enabled']),
-                     'tvsubtitles': cast_bool(Prefs['provider.tvsubtitles.enabled'])
+                     'tvsubtitles': cast_bool(Prefs['provider.tvsubtitles.enabled']),
+					 'legendastv': cast_bool(Prefs['provider.legendastv.enabled'])
                      }
 
         # ditch non-forced-subtitles-reporting providers
@@ -334,6 +335,10 @@ class Config(object):
                                                'use_tag_search': cast_bool(Prefs['provider.opensubtitles.use_tags']),
                                                'only_foreign': cast_bool(Prefs['subtitles.only_foreign'])
                                                },
+                             'legendastv': {'username': Prefs['provider.legendastv.username'],
+											'password': Prefs['provider.legendastv.password'],
+											'epScore': Prefs['provider.legendastv.epScore']
+											},
                              'podnapisi': {
                                  'only_foreign': cast_bool(Prefs['subtitles.only_foreign'])
                              },
