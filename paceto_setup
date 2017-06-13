@@ -1,0 +1,3 @@
+#!/bin/bash
+
+sudo cp ./paceto_libs/rarfile.* /usr/lib/plexmediaserver/Resources/Python/lib/python2.7/

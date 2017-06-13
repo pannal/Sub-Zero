@@ -54,7 +54,8 @@ class LegacyProviderManager(object):
                                      'opensubtitles = subliminal.providers.opensubtitles:OpenSubtitlesProvider',
                                      'podnapisi = subliminal.providers.podnapisi:PodnapisiProvider',
                                      'thesubdb = subliminal.providers.thesubdb:TheSubDBProvider',
-                                     'tvsubtitles = subliminal.providers.tvsubtitles:TVsubtitlesProvider']
+                                     'tvsubtitles = subliminal.providers.tvsubtitles:TVsubtitlesProvider',
+                                     'sabbz = subliminal.providers.sabbz:SabbzProvider']
 
         self.enabled_providers = enabled_providers or []
 

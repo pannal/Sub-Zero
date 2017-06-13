@@ -279,6 +279,32 @@
     "default": "true"
   },
   {
+    "id": "provider.sabbz.enabled",
+    "label": "Provider: Enable subs.sab.bz",
+    "type": "bool",
+    "default": "true"
+  },
+  {
+    "id": "provider.sabbz.use_random_agents",
+    "label": "subs.sab.bz: Use random user agents",
+    "type": "bool",
+    "default": "false"
+  },
+  {
+    "id": "provider.sabbz.username",
+    "label": "subs.sab.bz Username",
+    "type": "text",
+    "default": ""
+  },
+  {
+    "id": "provider.sabbz.password",
+    "label": "subs.sab.bz Password",
+    "type": "text",
+    "option": "hidden",
+    "default": "",
+    "secure": "true"
+  },
+  {
     "id": "provider.opensubtitles.use_tags",
     "label": "I keep the exact (release-) filename of my media files",
     "type": "bool",

@@ -1,0 +1,230 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+import io
+import logging
+import re
+from rarfile import RarFile
+from pprint import pprint
+
+from babelfish import Language
+from requests import Session
+
+from . import ParserBeautifulSoup, Provider, get_version
+from .. import __version__
+from ..cache import EPISODE_EXPIRATION_TIME, SHOW_EXPIRATION_TIME, region
+from ..exceptions import ProviderError
+from ..subtitle import Subtitle, fix_line_ending, guess_matches, guess_properties
+from ..video import Episode
+
+logger = logging.getLogger(__name__)
+
+link_re = re.compile('^(?P<series>.+?)(?: \(?\d{4}\)?| \((?:US|UK)\))? \((?P<first_year>\d{4})-\d{4}\)$')
+episode_id_re = re.compile('^episode-\d+\.html$')
+
+class SabbzSubtitle(Subtitle):
+    provider_name = 'sabbz'
+
+    def __init__(self, language, page_link, subtitle_id, series, season, episode, year, rip, release):
+        super(SabbzSubtitle, self).__init__(language, page_link=page_link)
+        self.subtitle_id = subtitle_id
+        self.series = series
+        self.season = season
+        self.episode = episode
+        self.year = year
+        self.rip = rip
+        self.release = release
+
+    @property
+    def id(self):
+        return str(self.subtitle_id)
+
+    def get_matches(self, video, hearing_impaired=False):
+        matches = super(SabbzSubtitle, self).get_matches(video, hearing_impaired=hearing_impaired)
+
+        # series
+        if video.series and self.series.lower() == video.series.lower():
+            matches.add('series')
+        # season
+        if video.season and self.season == video.season:
+            matches.add('season')
+        # episode
+        if video.episode and self.episode == video.episode:
+            matches.add('episode')
+        # year
+        if self.year == video.year:
+            matches.add('year')
+        # release_group
+        if video.release_group and self.release and video.release_group.lower() in self.release.lower():
+            matches.add('release_group')
+        # other properties
+        if self.release:
+            matches |= guess_matches(video, guess_properties(self.release), partial=True)
+        if self.rip:
+            matches |= guess_matches(video, guess_properties(self.rip), partial=True)
+
+        return matches
+
+
+class SabbzProvider(Provider):
+    languages = {Language('por', 'BR')} | {Language(l) for l in [
+        'ara', 'bul', 'ces', 'dan', 'deu', 'ell', 'eng', 'fin', 'fra', 'hun', 'ita', 'jpn', 'kor', 'nld', 'pol', 'por',
+        'ron', 'rus', 'spa', 'swe', 'tur', 'ukr', 'zho'
+    ]}
+    video_types = (Episode,)
+    server_url = 'http://subs.sab.bz/'
+    
+    def __init__(self, username=None, password=None):
+        if username is not None and password is None or username is None and password is not None:
+            raise ConfigurationError('Username and password must be specified')
+
+        self.username = username
+        self.password = password
+        self.logged_in = False
+
+    def initialize(self):
+        self.session = Session()
+        self.session.headers = {'User-Agent': 'Subliminal/%s' % get_version(__version__)}
+        logger.info('PACETO before login %r', self.session)
+        
+        # login
+        if self.username is not None and self.password is not None:
+            logger.info('Logging in')
+            data = {'UserName': self.username, 'PassWord': self.password, 'CookieDate': 1, 'submit': '1'}
+            r = self.session.post(self.server_url + 'forum/index.php?act=Login&CODE=01&return=http://subs.sab.bz', data, allow_redirects=False, timeout=10)
+
+            if r.status_code != 302:
+                logger.info('PACETO sabbz unable to login. Failed with status %r', r.status_code)
+                raise AuthenticationError(self.username)
+
+            logger.info('PACETO: sabbz Successfully Logged In Logged in %r' , self.session)
+            self.logged_in = True            
+
+    def terminate(self):
+        self.session.close()
+
+    @region.cache_on_arguments(expiration_time=SHOW_EXPIRATION_TIME)
+    def search_show_id(self, series, year=None):
+        """Search the show id from the `series` and `year`.
+
+        :param string series: series of the episode.
+        :param year: year of the series, if any.
+        :type year: int or None
+        :return: the show id, if any.
+        :rtype: int or None
+
+        """
+        # make the search
+        logger.info('Searching show id for %r', series)
+        r = self.session.post(self.server_url + 'index.php', data={'q': series}, timeout=10)
+        r.raise_for_status()
+
+        # get the series out of the suggestions
+        soup = ParserBeautifulSoup(r.content, ['lxml', 'html.parser'])
+        show_id = None
+        for suggestion in soup.select('div.left li div a[href^="/tvshow-"]'):
+            match = link_re.match(suggestion.text)
+            if not match:
+                logger.error('Failed to match %s', suggestion.text)
+                continue
+
+            if match.group('series').lower() == series.lower():
+                if year is not None and int(match.group('first_year')) != year:
+                    logger.debug('Year does not match')
+                    continue
+                show_id = int(suggestion['href'][8:-5])
+                logger.debug('Found show id %d', show_id)
+                break
+
+        return show_id
+
+    @region.cache_on_arguments(expiration_time=EPISODE_EXPIRATION_TIME)
+    def get_episode_ids(self, show_id, season):
+        """Get episode ids from the show id and the season.
+
+        :param int show_id: show id.
+        :param int season: season of the episode.
+        :return: episode ids per episode number.
+        :rtype: dict
+
+        """
+        # get the page of the season of the show
+        logger.info('Getting the page of show id %d, season %d', show_id, season)
+        r = self.session.get(self.server_url + 'tvshow-%d-%d.html' % (show_id, season), timeout=10)
+        soup = ParserBeautifulSoup(r.content, ['lxml', 'html.parser'])
+
+        # loop over episode rows
+        episode_ids = {}
+        for row in soup.select('table#table5 tr'):
+            # skip rows that do not have a link to the episode page
+            if not row('a', href=episode_id_re):
+                continue
+
+            # extract data from the cells
+            cells = row('td')
+            episode = int(cells[0].text.split('x')[1])
+            episode_id = int(cells[1].a['href'][8:-5])
+            episode_ids[episode] = episode_id
+
+        if episode_ids:
+            logger.debug('Found episode ids %r', episode_ids)
+        else:
+            logger.warning('No episode ids found')
+
+        return episode_ids
+
+    def query(self, series, season, episode, year=None):
+        # search the show id
+        show_id = self.search_show_id(series, year)
+        if show_id is None:
+            logger.error('No show id found for %r (%r)', series, {'year': year})
+            return []
+
+        # get the episode ids
+        episode_ids = self.get_episode_ids(show_id, season)
+        if episode not in episode_ids:
+            logger.error('Episode %d not found', episode)
+            return []
+
+        # get the episode page
+        logger.info('Getting the page for episode %d', episode_ids[episode])
+        r = self.session.get(self.server_url + 'episode-%d.html' % episode_ids[episode], timeout=10)
+        soup = ParserBeautifulSoup(r.content, ['lxml', 'html.parser'])
+
+        # loop over subtitles rows
+        subtitles = []
+        for row in soup.select('.subtitlen'):
+            # read the item
+            language = Language.fromsabbz(row.h5.img['src'][13:-4])
+            subtitle_id = int(row.parent['href'][10:-5])
+            page_link = self.server_url + 'subtitle-%d.html' % subtitle_id
+            rip = row.find('p', title='rip').text.strip() or None
+            release = row.find('p', title='release').text.strip() or None
+
+            subtitle = SabbzSubtitle(language, page_link, subtitle_id, series, season, episode, year, rip,
+                                           release)
+            logger.info('Found subtitle %s', subtitle)
+            subtitles.append(subtitle)
+
+        return subtitles
+
+    def list_subtitles(self, video, languages):
+        return [s for s in self.query(video.series, video.season, video.episode, video.year) if s.language in languages]
+
+    def download_subtitle(self, subtitle):
+        # download as a rar
+        logger.info('Downloading subtitle %r', subtitle)
+        r = self.session.get(self.server_url + 'index.php?act=download&attach_id=%d' % subtitle.subtitle_id, headers={'Referer': subtitle.page_link}, timeout=10)
+        r.raise_for_status()
+        
+        # open the rar
+        with RarFile(io.BytesIO(r.content)) as rar:
+            if len(rar.namelist()) > 1:
+                logger.info('More than one file to unrar - %r subtitle files found (pick one)', len(rar.namelist()))
+
+
+            for filename in rar.namelist():
+                logger.info('PACETO picking subtitles file %s', filename)  
+                if filename.endswith('.srt'):
+                    subtitle.content = fix_line_ending(rar.read(filename))
+                    break
+                                                                  

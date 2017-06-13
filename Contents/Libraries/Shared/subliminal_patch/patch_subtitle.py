@@ -112,6 +112,7 @@ class PatchedSubtitle(Subtitle):
 
         # Bulgarian, Serbian and Macedonian
         elif self.language.alpha3 in ('bul', 'srp', 'mkd', 'mac'):
+
             # Eastern European Group 2
             encodings.append('windows-1251')
         else:

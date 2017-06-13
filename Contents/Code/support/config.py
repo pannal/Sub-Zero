@@ -314,13 +314,15 @@ class Config(object):
                      # 'thesubdb': Prefs['provider.thesubdb.enabled'],
                      'podnapisi': cast_bool(Prefs['provider.podnapisi.enabled']),
                      'addic7ed': cast_bool(Prefs['provider.addic7ed.enabled']),
-                     'tvsubtitles': cast_bool(Prefs['provider.tvsubtitles.enabled'])
+                     'tvsubtitles': cast_bool(Prefs['provider.tvsubtitles.enabled']),
+                     'sabbz': cast_bool(Prefs['provider.sabbz.enabled'])
                      }
 
         # ditch non-forced-subtitles-reporting providers
         if cast_bool(Prefs['subtitles.only_foreign']):
             providers["addic7ed"] = False
             providers["tvsubtitles"] = False
+            providers["sabbz"] = False
 
         return filter(lambda prov: providers[prov], providers)
 
@@ -328,6 +330,10 @@ class Config(object):
         provider_settings = {'addic7ed': {'username': Prefs['provider.addic7ed.username'],
                                           'password': Prefs['provider.addic7ed.password'],
                                           'use_random_agents': cast_bool(Prefs['provider.addic7ed.use_random_agents']),
+                                          },
+                             'sabbz': {'username': Prefs['provider.sabbz.username'],
+                                          'password': Prefs['provider.sabbz.password'],
+                                          'use_random_agents': cast_bool(Prefs['provider.sabbz.use_random_agents']),
                                           },
                              'opensubtitles': {'username': Prefs['provider.opensubtitles.username'],
                                                'password': Prefs['provider.opensubtitles.password'],
