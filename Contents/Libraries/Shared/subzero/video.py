@@ -1,4 +1,5 @@
 # coding=utf-8
+
 import logging
 import os
 
@@ -26,11 +27,16 @@ def parse_video(fn, video_info, hints, external_subtitles=False, embedded_subtit
         return video
 
     # refiners
-
+    # fixme: add prefs for filebot, sonarr and radarr
     refine_kwargs = {
-        "episode_refiners": ('tvdb', 'sz_omdb'),
-        "movie_refiners": ('sz_omdb',),
+        "episode_refiners": ('filebot', 'tvdb', 'sz_omdb',),#('drone',),
+        "movie_refiners": ('filebot', 'sz_omdb',),
         "embedded_subtitles": False,
+        "sonarr": {
+            "base_url": "http://127.0.0.1:8989/nzbdrone",
+            "api_key": "xxxxxxxxxxxxxxxxxxxx"
+        },
+
     }
 
     # our own metadata refiner :)

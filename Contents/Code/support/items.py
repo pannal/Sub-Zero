@@ -392,7 +392,7 @@ def set_mods_for_part(rating_key, part_id, language, item_type, mods, mode="add"
         setattr(subtitle, "_guessed_encoding", current_sub.encoding)
 
         if current_sub.encoding != "utf-8":
-            subtitle.set_encoding("utf-8")
+            subtitle.normalize()
             current_sub.content = subtitle.content
             current_sub.encoding = "utf-8"
             storage.save(stored_subs)

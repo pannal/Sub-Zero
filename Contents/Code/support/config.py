@@ -21,7 +21,7 @@ from subzero.lib.io import FileIO, get_viable_encoding
 from subzero.util import get_root_path
 from subzero.constants import PLUGIN_NAME, PLUGIN_IDENTIFIER, MOVIE, SHOW, MEDIA_TYPE_TO_STRING
 from lib import Plex
-from helpers import check_write_permissions, cast_bool, cast_int
+from helpers import check_write_permissions, cast_bool, cast_int, mswindows
 
 SUBTITLE_EXTS = ['utf', 'utf8', 'utf-8', 'srt', 'smi', 'rt', 'ssa', 'aqt', 'jss', 'ass', 'idx', 'sub', 'txt', 'psb',
                  'vtt']
@@ -100,6 +100,7 @@ class Config(object):
     react_to_activities = False
     activity_mode = None
     no_refresh = False
+    plex_transcoder = None
 
     store_recently_played_amount = 40
 
@@ -162,6 +163,7 @@ class Config(object):
         self.default_mods = self.get_default_mods()
         self.debug_mods = cast_bool(Prefs['log_debug_mods'])
         self.no_refresh = os.environ.get("SZ_NO_REFRESH", False)
+        self.plex_transcoder = self.get_plex_transcoder()
         self.initialized = True
 
     def init_libraries(self):
@@ -594,6 +596,15 @@ class Config(object):
             self.activity_mode = "hybrid-plus"
         else:
             self.activity_mode = "next_episode"
+
+    def get_plex_transcoder(self):
+        base_path = os.environ.get("PLEX_MEDIA_SERVER_HOME", None)
+        if not base_path:
+            return
+
+        fn = os.path.join(base_path, "Plex Transcoder" if not mswindows else "Plex Transcoder.exe")
+        if os.path.isfile(fn):
+            return fn
 
     def init_subliminal_patches(self):
         # configure custom subtitle destination folders for scanning pre-existing subs

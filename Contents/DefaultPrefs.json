@@ -203,6 +203,24 @@
     "default": "true"
   },
   {
+    "id": "drone_api.sonarr.enable",
+    "label": "Enable Sonarr integration",
+    "type": "bool",
+    "default": "false"
+  },
+  {
+    "id": "drone_api.sonarr.url",
+    "label": "Sonarr URL (add URL base if configured)",
+    "type": "text",
+    "default": "http://127.0.0.1:8989"
+  },
+  {
+    "id": "drone_api.sonarr.apikey",
+    "label": "Sonarr API key",
+    "type": "text",
+    "default": ""
+  },
+  {
     "id": "provider.opensubtitles.enabled",
     "label": "Provider: Enable OpenSubtitles",
     "type": "bool",

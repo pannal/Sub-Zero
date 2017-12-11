@@ -4,6 +4,7 @@ import datetime
 import os
 import pprint
 import copy
+import types
 
 from subliminal_patch.core import save_subtitles as subliminal_save_subtitles
 from subzero.subtitle_storage import StoredSubtitlesManager
@@ -36,7 +37,7 @@ def store_subtitle_info(scanned_video_part_map, downloaded_subtitles, storage_ty
 
         for subtitle in video_subtitles:
             lang = str(subtitle.language)
-            subtitle.set_encoding("utf-8")
+            subtitle.normalize()
             Log.Debug(u"Adding subtitle to storage: %s, %s, %s, %s" % (video_id, part_id, title,
                                                                        subtitle.guess_encoding()))
             ret_val = stored_subs.add(part_id, lang, subtitle, storage_type, mode=mode)
@@ -71,32 +72,43 @@ def log_storage(key):
         Log.Debug(pprint.pformat(Dict[key]))
 
 
-def save_subtitles_to_file(subtitles):
+def get_target_folder(file_path):
+    fld = None
     fld_custom = Prefs["subtitles.save.subFolder.Custom"].strip() \
         if Prefs["subtitles.save.subFolder.Custom"] else None
 
+    if fld_custom or Prefs["subtitles.save.subFolder"] != "current folder":
+        # specific subFolder requested, create it if it doesn't exist
+        fld_base = os.path.split(file_path)[0]
+        if fld_custom:
+            if fld_custom.startswith("/"):
+                # absolute folder
+                fld = fld_custom
+            else:
+                fld = os.path.join(fld_base, fld_custom)
+        else:
+            fld = os.path.join(fld_base, Prefs["subtitles.save.subFolder"])
+        fld = force_unicode(fld)
+        if not os.path.exists(fld):
+            os.makedirs(fld)
+    return fld
+
+
+def save_subtitles_to_file(subtitles, tags=None, forced_tag=None):
+    forced_tag = forced_tag or config.forced_only
     for video, video_subtitles in subtitles.items():
         if not video_subtitles:
             continue
 
-        fld = None
-        if fld_custom or Prefs["subtitles.save.subFolder"] != "current folder":
-            # specific subFolder requested, create it if it doesn't exist
-            fld_base = os.path.split(video.name)[0]
-            if fld_custom:
-                if fld_custom.startswith("/"):
-                    # absolute folder
-                    fld = fld_custom
-                else:
-                    fld = os.path.join(fld_base, fld_custom)
-            else:
-                fld = os.path.join(fld_base, Prefs["subtitles.save.subFolder"])
-            fld = force_unicode(fld)
-            if not os.path.exists(fld):
-                os.makedirs(fld)
-        subliminal_save_subtitles(video, video_subtitles, directory=fld, single=cast_bool(Prefs['subtitles.only_one']),
-                                  chmod=config.chmod, forced_tag=config.forced_only, path_decoder=force_unicode,
-                                  debug_mods=config.debug_mods, formats=config.subtitle_formats)
+        if not isinstance(video, types.StringTypes):
+            file_path = video.name
+        else:
+            file_path = video
+
+        fld = get_target_folder(video)
+        subliminal_save_subtitles(file_path, video_subtitles, directory=fld, single=cast_bool(Prefs['subtitles.only_one']),
+                                  chmod=config.chmod, forced_tag=forced_tag, path_decoder=force_unicode,
+                                  debug_mods=config.debug_mods, formats=config.subtitle_formats, tags=tags)
     return True
 
 

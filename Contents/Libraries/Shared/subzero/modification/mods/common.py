@@ -40,8 +40,9 @@ class CommonFixes(SubtitleTextModification):
         # no space after starting dash
         NReProcessor(re.compile(r'(?u)^-(?![\s-])'), "- ", name="CM_dash_space"),
 
-        # remove starting spaced dots (not matching ellipses
-        NReProcessor(re.compile(r'(?u)^(?!\s?(\.\s\.\s\.)|(\s?\.{3}))[\s.]*'), "", name="CM_starting_spacedots"),
+        # remove starting spaced dots (not matching ellipses)
+        NReProcessor(re.compile(r'(?u)^(?!\s?(\.\s\.\s\.)|(\s?\.{3}))(?=\.+\s+)[\s.]*'), "",
+                     name="CM_starting_spacedots"),
 
         # space missing before doublequote
         # ReProcessor(re.compile(r'(?u)(?<!^)(?<![\s(\["])("[^"]+")'), r' \1', name="CM_space_before_dblquote"),

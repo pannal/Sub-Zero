@@ -36,6 +36,9 @@ class SubripFormat(FormatBase):
         following_lines = [] # contains lists of lines following each timestamp
 
         for line in fp:
+            if not line.strip():
+                continue
+
             stamps = TIMESTAMP.findall(line)
             if len(stamps) == 2: # timestamp line
                 start, end = map(timestamp_to_ms, stamps)
@@ -55,6 +58,7 @@ class SubripFormat(FormatBase):
             s = re.sub(r"< *u *>", "{\\u1}", s) # not r" for Python 2.7 compat, triggers unicodeescape
             s = re.sub(r"< */ *u *>", "{\\u0}", s)
             s = re.sub(r"< */? *[a-zA-Z][^>]*>", "", s) # strip other HTML tags
+            s = re.sub(r"\r", "", s)  # convert newlines
             s = re.sub(r"\n", r"\N", s) # convert newlines
             return s
 

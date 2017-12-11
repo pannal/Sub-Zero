@@ -16,6 +16,7 @@ class SubtitleModifications(object):
     debug = False
     language = None
     initialized_mods = {}
+    f = None
 
     font_style_tag_start = u"{\\"
 

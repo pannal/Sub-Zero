@@ -210,7 +210,7 @@ def ValidatePrefs():
     for attr in [
             "app_support_path", "data_path", "data_items_path", "enable_agent",
             "enable_channel", "permissions_ok", "missing_permissions", "fs_encoding",
-            "subtitle_destination_folder", "dbm_supported", "lang_list", "providers"]:
+            "subtitle_destination_folder", "dbm_supported", "lang_list", "providers", "plex_transcoder"]:
         Log.Debug("config.%s: %s", attr, getattr(config, attr))
 
     for attr in ["plugin_log_path", "server_log_path"]:

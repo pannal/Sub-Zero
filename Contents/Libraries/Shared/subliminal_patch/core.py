@@ -36,8 +36,8 @@ INCLUDE_EXOTIC_SUBS = True
 DOWNLOAD_TRIES = 0
 DOWNLOAD_RETRY_SLEEP = 6
 
-REMOVE_CRAP_FROM_FILENAME = re.compile(r"(?i)[\s_-]+(obfuscated|scrambled|nzbgeek|"
-                                       r"chamele0n|buymore|xpost|postbot)(\.\w+)$")
+REMOVE_CRAP_FROM_FILENAME = re.compile(r"(?i)[\s_-]+(obfuscated|scrambled|nzbgeek|chamele0n"
+                                       r"|buymore|xpost|postbot)(\.\w+|$)$")
 
 SUBTITLE_EXTENSIONS = ('.srt', '.sub', '.smi', '.txt', '.ssa', '.ass', '.mpl', '.vtt')
 
@@ -234,7 +234,7 @@ class SZProviderPool(ProviderPool):
             logger.error('Invalid subtitle')
             return False
 
-        subtitle.set_encoding("utf-8")
+        subtitle.normalize()
 
         return True
 
@@ -401,7 +401,19 @@ def scan_video(path, dont_use_actual_file=False, hints=None):
 
     # hint guessit the filename itself and its 2 parent directories if we're an episode (most likely
     # Series name/Season/filename), else only one
-    guess_from = os.path.join(*os.path.normpath(path).split(os.path.sep)[-3 if video_type == "episode" else -2:])
+    split_path = os.path.normpath(path).split(os.path.sep)[-3 if video_type == "episode" else -2:]
+
+    # remove crap from folder names
+    if video_type == "episode":
+        if len(split_path) > 2:
+            split_path[-3] = REMOVE_CRAP_FROM_FILENAME.sub(r"\2", split_path[-3])
+    else:
+        if len(split_path) > 1:
+            split_path[-2] = REMOVE_CRAP_FROM_FILENAME.sub(r"\2", split_path[-2])
+
+    guess_from = os.path.join(*split_path)
+
+    # remove crap from file name
     guess_from = REMOVE_CRAP_FROM_FILENAME.sub(r"\2", guess_from)
 
     # guess
@@ -611,7 +623,7 @@ def download_best_subtitles(videos, languages, min_score=0, hearing_impaired=Fal
     return downloaded_subtitles
 
 
-def get_subtitle_path(video_path, language=None, extension='.srt', forced_tag=False):
+def get_subtitle_path(video_path, language=None, extension='.srt', forced_tag=False, tags=None):
     """Get the subtitle path using the `video_path` and `language`.
 
     :param str video_path: path to the video.
@@ -623,18 +635,21 @@ def get_subtitle_path(video_path, language=None, extension='.srt', forced_tag=Fa
 
     """
     subtitle_root = os.path.splitext(video_path)[0]
+    tags = tags or []
+    if forced_tag:
+        tags.append("forced")
 
     if language:
         subtitle_root += '.' + str(language)
 
-    if forced_tag:
-        subtitle_root += ".forced"
+    if tags:
+        subtitle_root += ".%s" % "-".join(tags)
 
     return subtitle_root + extension
 
 
-def save_subtitles(video, subtitles, single=False, directory=None, chmod=None, formats=("srt",), forced_tag=False,
-                   path_decoder=None, debug_mods=False):
+def save_subtitles(file_path, subtitles, single=False, directory=None, chmod=None, formats=("srt",), forced_tag=False,
+                   tags=None, path_decoder=None, debug_mods=False):
     """Save subtitles on filesystem.
 
     Subtitles are saved in the order of the list. If a subtitle with a language has already been saved, other subtitles
@@ -643,9 +658,8 @@ def save_subtitles(video, subtitles, single=False, directory=None, chmod=None, f
     The extension used is `.lang.srt` by default or `.srt` is `single` is `True`, with `lang` being the IETF code for
     the :attr:`~subliminal.subtitle.Subtitle.language` of the subtitle.
 
+    :param file_path: video file path
     :param formats: list of "srt" and "vtt"
-    :param video: video of the subtitles.
-    :type video: :class:`~subliminal.video.Video`
     :param subtitles: subtitles to save.
     :type subtitles: list of :class:`~subliminal.subtitle.Subtitle`
     :param bool single: save a single subtitle, default is to save one subtitle per language.
@@ -671,7 +685,8 @@ def save_subtitles(video, subtitles, single=False, directory=None, chmod=None, f
             continue
 
         # create subtitle path
-        subtitle_path = get_subtitle_path(video.name, None if single else subtitle.language, forced_tag=forced_tag)
+        subtitle_path = get_subtitle_path(file_path, None if single else subtitle.language, forced_tag=forced_tag,
+                                          tags=tags)
         if directory is not None:
             subtitle_path = os.path.join(directory, os.path.split(subtitle_path)[1])
 

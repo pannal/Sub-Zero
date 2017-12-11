@@ -73,14 +73,25 @@ class Subtitle(Subtitle_):
         return self
 
     def set_encoding(self, encoding):
-        logger.debug("Encoding change requested: to %s, from %s", encoding, self.guess_encoding())
-        if encoding == self.guess_encoding():
+        ge = self.guess_encoding()
+        logger.debug("Encoding change requested: to %s, from %s", encoding, ge)
+        if encoding == ge:
             logger.debug("Encoding already is %s", encoding)
             return
 
         unicontent = self.text
         self.content = unicontent.encode(encoding)
         self._guessed_encoding = encoding
+
+    def normalize(self):
+        """
+        Set encoding to UTF-8 and normalize line endings
+        :return:
+        """
+        self.set_encoding("utf-8")
+
+        # normalize line endings
+        self.content = self.content.replace("\r\n", "\n").replace('\r', '\n')
 
     def guess_encoding(self):
         """Guess encoding using the language, falling back on chardet.
@@ -294,6 +305,7 @@ class Subtitle(Subtitle_):
 
         submods = SubtitleModifications(debug=debug)
         if submods.load(content=self.text, language=self.language):
+            logger.info("Applying mods: %s", self.mods)
             submods.modify(*self.mods)
 
             content = fix_text(self.pysubs2_to_unicode(submods.f, format=format), **ftfy_defaults)\
