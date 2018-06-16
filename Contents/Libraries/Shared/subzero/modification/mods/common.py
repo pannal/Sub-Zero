@@ -31,7 +31,15 @@ class CommonFixes(SubtitleTextModification):
         NReProcessor(re.compile(ur'(?u)(^[*#¶\s]*[*#¶]+[*#¶\s]*$)'), u"♪", name="CM_music_symbols"),
 
         # '' = "
-        StringProcessor("''", '"', name="CM_double_apostrophe"),
+        NReProcessor(re.compile(ur'(?u)([\'’ʼ❜‘‛][\'’ʼ❜‘‛]+)'), u'"', name="CM_double_apostrophe"),
+
+        # normalize quotes
+        NReProcessor(re.compile(ur'(?u)(\s*["”“‟„])\s*(["”“‟„]["”“‟„\s]*)'),
+                     lambda match: '"' + (" " if match.group(2).endswith(" ") else ""),
+                     name="CM_normalize_quotes"),
+
+        # normalize single quotes
+        NReProcessor(re.compile(ur'(?u)([\'’ʼ❜‘‛])'), u"'", name="CM_normalize_squotes"),
 
         # remove leading ...
         NReProcessor(re.compile(r'(?u)^\.\.\.[\s]*'), "", name="CM_leading_ellipsis"),
