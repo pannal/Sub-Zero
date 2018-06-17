@@ -13,7 +13,7 @@
         <key>CFBundleSignature</key>
         <string>????</string>
         <key>CFBundleVersion</key>
-        <string>2.5.8.2671</string>
+        <string>2.5.8.2674</string>
         <key>PlexFrameworkVersion</key>
         <string>2</string>
         <key>PlexPluginClass</key>
@@ -32,7 +32,7 @@
 
 &lt;h1&gt;Sub-Zero for Plex&lt;/h1&gt;&lt;i&gt;Subtitles done right&lt;/i&gt;
 
-Version 2.5.8.2671 DEV
+Version 2.5.8.2674 DEV
 
 Originally based on @bramwalet's awesome &lt;a href=&quot;https://github.com/bramwalet/Subliminal.bundle&quot;&gt;Subliminal.bundle&lt;/a&gt;
 
