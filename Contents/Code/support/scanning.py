@@ -44,7 +44,7 @@ def scan_video(pms_video_info, ignore_all=False, hints=None, rating_key=None, pr
 
     # embedded subtitles
     # fixme: skip the whole scanning process if known_embedded == wanted languages?
-    stream_languages = []
+    audio_languages = []
     if plexpy_part:
         for stream in plexpy_part.streams:
             if stream.stream_type == 2:
@@ -58,7 +58,7 @@ def scan_video(pms_video_info, ignore_all=False, hints=None, rating_key=None, pr
                 if not lang and config.treat_und_as_first:
                     lang = list(config.lang_list)[0]
 
-                stream_languages.append(lang.alpha3)
+                audio_languages.append(lang)
 
             # subtitle stream
             elif stream.stream_type == 3 and embedded_subtitles:
@@ -98,9 +98,9 @@ def scan_video(pms_video_info, ignore_all=False, hints=None, rating_key=None, pr
                             providers=providers)
 
         # set stream languages
-        if stream_languages:
-            video.stream_languages = set(stream_languages)
-            Log.Info("Found audio streams: %s" % stream_languages)
+        if audio_languages:
+            video.audio_languages = audio_languages
+            Log.Info("Found audio streams: %s" % ", ".join([str(l) for l in audio_languages]))
 
         if not ignore_all:
             set_existing_languages(video, pms_video_info, external_subtitles=external_subtitles,

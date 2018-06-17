@@ -6,7 +6,7 @@ from subzero.language import Language
 import subliminal_patch as subliminal
 
 from support.config import config
-from support.helpers import cast_bool
+from support.helpers import cast_bool, audio_streams_match_languages
 from subtitlehelpers import get_subtitles_from_metadata
 from subliminal_patch import compute_score
 from support.plex_media import get_blacklist_from_part_map
@@ -17,7 +17,10 @@ from support.storage import get_pack_data, store_pack_data
 def get_missing_languages(video, part):
     languages = set([Language.fromietf(str(l)) for l in config.lang_list])
 
-
+    if audio_streams_match_languages(video, list(config.lang_list)):
+        Log.Debug("Skipping subtitle search for %s, audio streams are in correct language(s)",
+                  video)
+        return set()
 
     # should we treat IETF as alpha3? (ditch the country part)
     alpha3_map = {}

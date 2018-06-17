@@ -29,7 +29,8 @@ from support.storage import save_subtitles, store_subtitle_info, get_subtitle_st
 from support.items import is_ignored
 from support.config import config
 from support.lib import get_intent
-from support.helpers import track_usage, get_title_for_video_metadata, get_identifier, cast_bool
+from support.helpers import track_usage, get_title_for_video_metadata, get_identifier, cast_bool, \
+    audio_streams_match_languages
 from support.history import get_history
 from support.data import dispatch_migrate
 from support.activities import activity
@@ -126,6 +127,11 @@ def agent_extract_embedded(video_part_map):
         for scanned_video, part_info in video_part_map.iteritems():
             plexapi_item = scanned_video.plexapi_metadata["item"]
             stored_subs = subtitle_storage.load_or_new(plexapi_item)
+
+            if audio_streams_match_languages(scanned_video, list(config.lang_list)):
+                Log.Debug("Skipping embedded subtitle extraction for %s, audio streams are in correct language(s)",
+                          plexapi_item.rating_key)
+                continue
 
             for plexapi_part in get_all_parts(plexapi_item):
                 item_count = item_count + 1
