@@ -231,7 +231,8 @@ class Config(object):
                         try:
                             mig_result = getattr(self, func)(user_prefs, from_version=config_version,
                                                              to_version=version,
-                                                             current_version=self.config_version)
+                                                             current_version=self.config_version,
+                                                             migrated_prefs=update_prefs)
                             update_prefs.update(mig_result)
                             Dict["config_version"] = version
                             Dict.Save()
@@ -243,7 +244,7 @@ class Config(object):
                 if update_prefs:
                     update_user_prefs(update_prefs, Prefs, Log)
 
-    def migrate_prefs_to_1(self, user_prefs, from_version=None, to_version=None, current_version=None):
+    def migrate_prefs_to_1(self, user_prefs, **kwargs):
         update_prefs = {}
         if "subtitles.only_foreign" in user_prefs and user_prefs["subtitles.only_foreign"] == "true":
             update_prefs["subtitles.when"] = "1"
