@@ -44,32 +44,45 @@ def scan_video(pms_video_info, ignore_all=False, hints=None, rating_key=None, pr
 
     # embedded subtitles
     # fixme: skip the whole scanning process if known_embedded == wanted languages?
+    stream_languages = []
     if plexpy_part:
-        if embedded_subtitles:
-            for stream in plexpy_part.streams:
-                # subtitle stream
-                if stream.stream_type == 3:
-                    is_forced = helpers.is_stream_forced(stream)
+        for stream in plexpy_part.streams:
+            if stream.stream_type == 2:
+                lang = None
+                try:
+                    lang = language_from_stream(stream.language_code)
+                except LanguageError:
+                    Log.Debug("Couldn't detect embedded subtitle stream language: %s", stream.language_code)
 
-                    if (config.forced_only and is_forced) or \
-                            (not config.forced_only and not is_forced):
+                # treat unknown language as lang1?
+                if not lang and config.treat_und_as_first:
+                    lang = list(config.lang_list)[0]
 
-                        # embedded subtitle
-                        # fixme: tap into external subtitles here instead of scanning for ourselves later?
-                        if stream.codec and getattr(stream, "index", None):
-                            if config.exotic_ext or stream.codec.lower() in config.text_based_formats:
-                                lang = None
-                                try:
-                                    lang = language_from_stream(stream.language_code)
-                                except LanguageError:
-                                    Log.Debug("Couldn't detect embedded subtitle stream language: %s", stream.language_code)
+                stream_languages.append(lang.alpha3)
 
-                                # treat unknown language as lang1?
-                                if not lang and config.treat_und_as_first:
-                                    lang = list(config.lang_list)[0]
+            # subtitle stream
+            elif stream.stream_type == 3 and embedded_subtitles:
+                is_forced = helpers.is_stream_forced(stream)
 
-                                if lang:
-                                    known_embedded.append(lang.alpha3)
+                if (config.forced_only and is_forced) or \
+                        (not config.forced_only and not is_forced):
+
+                    # embedded subtitle
+                    # fixme: tap into external subtitles here instead of scanning for ourselves later?
+                    if stream.codec and getattr(stream, "index", None):
+                        if config.exotic_ext or stream.codec.lower() in config.text_based_formats:
+                            lang = None
+                            try:
+                                lang = language_from_stream(stream.language_code)
+                            except LanguageError:
+                                Log.Debug("Couldn't detect embedded subtitle stream language: %s", stream.language_code)
+
+                            # treat unknown language as lang1?
+                            if not lang and config.treat_und_as_first:
+                                lang = list(config.lang_list)[0]
+
+                            if lang:
+                                known_embedded.append(lang.alpha3)
     else:
         Log.Warn("Part %s missing of %s, not able to scan internal streams", plex_part.id, rating_key)
 
@@ -83,6 +96,11 @@ def scan_video(pms_video_info, ignore_all=False, hints=None, rating_key=None, pr
         # get basic video info scan (filename)
         video = parse_video(plex_part.file, hints, skip_hashing=config.low_impact_mode or skip_hashing,
                             providers=providers)
+
+        # set stream languages
+        if stream_languages:
+            video.stream_languages = set(stream_languages)
+            Log.Info("Found audio streams: %s" % stream_languages)
 
         if not ignore_all:
             set_existing_languages(video, pms_video_info, external_subtitles=external_subtitles,
