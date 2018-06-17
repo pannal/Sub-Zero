@@ -11,7 +11,12 @@ def get_user_prefs(Prefs, Logger):
     :return:
     """
 
-    prefs_set = Prefs._sandbox.preferences._sets[PLUGIN_IDENTIFIER]
+    try:
+        prefs_set = Prefs._sandbox.preferences._sets[PLUGIN_IDENTIFIER]
+    except:
+        Logger.Error("Loading user prefs failed: %s", traceback.format_exc())
+        return {}
+
     user_prefs = {}
     try:
         xml_path = prefs_set._user_file_path
