@@ -165,9 +165,13 @@ class Config(object):
         self.data_items_path = os.path.join(self.data_path, "DataItems")
         self.universal_plex_token = self.get_universal_plex_token()
         self.plex_token = os.environ.get("PLEXTOKEN", self.universal_plex_token)
+        try:
+            self.migrate_prefs()
+        except:
+            Log.Exception("Catastrophic failure when running prefs migration")
+
         subzero.constants.DEFAULT_TIMEOUT = lib.DEFAULT_TIMEOUT = self.pms_request_timeout = \
             min(cast_int(Prefs['pms_request_timeout'], 15), 45)
-        self.migrate_prefs()
         self.low_impact_mode = cast_bool(Prefs['low_impact_mode'])
         self.new_style_cache = cast_bool(Prefs['new_style_cache'])
         self.pack_cache_dir = self.get_pack_cache_dir()
