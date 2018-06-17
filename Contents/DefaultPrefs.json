@@ -179,10 +179,16 @@
     "default": "None"
   },
   {
-    "id": "subtitles.only_foreign",
-    "label": "Only download foreign/forced subtitles",
-    "type": "bool",
-    "default": "false"
+    "id": "subtitles.when",
+    "label": "Download subtitles",
+    "type": "enum",
+    "values": [
+      "Always",
+      "Only foreign/forced",
+      "When main audio stream is not Language 1",
+      "When main audio stream is not any configured language"
+    ],
+    "default": "Always"
   },
   {
     "id": "subtitles.language.ietf_display",

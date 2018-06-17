@@ -24,6 +24,7 @@ from subzero.lib.io import FileIO, get_viable_encoding
 from subzero.lib.dict import Dicked
 from subzero.util import get_root_path
 from subzero.constants import PLUGIN_NAME, PLUGIN_IDENTIFIER, MOVIE, SHOW, MEDIA_TYPE_TO_STRING
+from subzero.prefs import get_user_prefs, update_user_prefs
 from dogpile.cache.region import register_backend as register_cache_backend
 from lib import Plex
 from helpers import check_write_permissions, cast_bool, cast_int, mswindows
@@ -76,6 +77,7 @@ PROVIDER_THROTTLE_MAP = {
 
 
 class Config(object):
+    config_version = 1
     libraries_root = None
     plugin_info = ""
     version = None
@@ -165,6 +167,7 @@ class Config(object):
         self.plex_token = os.environ.get("PLEXTOKEN", self.universal_plex_token)
         subzero.constants.DEFAULT_TIMEOUT = lib.DEFAULT_TIMEOUT = self.pms_request_timeout = \
             min(cast_int(Prefs['pms_request_timeout'], 15), 45)
+        self.migrate_prefs()
         self.low_impact_mode = cast_bool(Prefs['low_impact_mode'])
         self.new_style_cache = cast_bool(Prefs['new_style_cache'])
         self.pack_cache_dir = self.get_pack_cache_dir()
@@ -181,7 +184,7 @@ class Config(object):
 
         self.subtitle_destination_folder = self.get_subtitle_destination_folder()
         self.subtitle_formats = self.get_subtitle_formats()
-        self.forced_only = cast_bool(Prefs["subtitles.only_foreign"])
+        self.forced_only = Prefs["subtitles.when"] == "Only foreign/forced"
         self.max_recent_items_per_library = int_or_default(Prefs["scheduler.max_recent_items_per_library"], 2000)
         self.sections = list(Plex["library"].sections())
         self.missing_permissions = []
@@ -209,6 +212,33 @@ class Config(object):
         self.embedded_auto_extract = cast_bool(Prefs["subtitles.embedded.autoextract"])
         self.ietf_as_alpha3 = cast_bool(Prefs["subtitles.language.ietf_normalize"])
         self.initialized = True
+
+    def migrate_prefs(self):
+        config_version = 0 if "config_version" not in Dict else Dict["config_version"]
+        if config_version < self.config_version:
+            user_prefs = get_user_prefs(Prefs, Log)
+            if user_prefs:
+                for i in range(config_version, self.config_version):
+                    version = i+1
+                    func = "migrate_prefs_to_%i" % version
+                    if hasattr(self, func):
+                        Log.Info("Migrating user prefs to version %i" % version)
+                        try:
+                            getattr(self, func)(user_prefs)
+                            Dict["config_version"] = version
+                            Dict.Save()
+                            Log.Info("User prefs migrated to version %i" % version)
+                        except:
+                            Log.Exception("User prefs migration from %i to %i failed" % (self.config_version, version))
+                            break
+
+    def migrate_prefs_to_1(self, user_prefs):
+        update_prefs = {}
+        if "subtitles.only_foreign" in user_prefs and user_prefs["subtitles.only_foreign"] == "true":
+            update_prefs["subtitles.when"] = "1"
+
+        if update_prefs:
+            update_user_prefs(update_prefs, Prefs, Log)
 
     def init_libraries(self):
         try_executables = []
