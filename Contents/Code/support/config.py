@@ -222,14 +222,17 @@ class Config(object):
         if config_version < self.config_version:
             user_prefs = get_user_prefs(Prefs, Log)
             if user_prefs:
+                update_prefs = {}
                 for i in range(config_version, self.config_version):
                     version = i+1
                     func = "migrate_prefs_to_%i" % version
                     if hasattr(self, func):
                         Log.Info("Migrating user prefs to version %i" % version)
                         try:
-                            getattr(self, func)(user_prefs, from_version=config_version, to_version=version,
-                                                current_version=self.config_version)
+                            mig_result = getattr(self, func)(user_prefs, from_version=config_version,
+                                                             to_version=version,
+                                                             current_version=self.config_version)
+                            update_prefs.update(mig_result)
                             Dict["config_version"] = version
                             Dict.Save()
                             Log.Info("User prefs migrated to version %i" % version)
@@ -237,13 +240,15 @@ class Config(object):
                             Log.Exception("User prefs migration from %i to %i failed" % (self.config_version, version))
                             break
 
+                if update_prefs:
+                    update_user_prefs(update_prefs, Prefs, Log)
+
     def migrate_prefs_to_1(self, user_prefs, from_version=None, to_version=None, current_version=None):
         update_prefs = {}
         if "subtitles.only_foreign" in user_prefs and user_prefs["subtitles.only_foreign"] == "true":
             update_prefs["subtitles.when"] = "1"
 
-        if update_prefs:
-            update_user_prefs(update_prefs, Prefs, Log)
+        return update_prefs
 
     def init_libraries(self):
         try_executables = []
