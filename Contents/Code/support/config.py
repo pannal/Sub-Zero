@@ -687,6 +687,7 @@ class Config(object):
             providers["subscene"] = False
 
         # ditch non-forced-subtitles-reporting providers
+        providers_forced_off = {}
         if self.forced_only:
             providers["addic7ed"] = False
             providers["tvsubtitles"] = False
@@ -698,6 +699,8 @@ class Config(object):
             providers["titlovi"] = False
             providers["argenteam"] = False
             providers["assrt"] = False
+            providers["subscene"] = False
+            providers_forced_off = dict(providers)
 
         if not self.unrar and providers["legendastv"]:
             providers["legendastv"] = False
@@ -706,7 +709,7 @@ class Config(object):
         # advanced settings
         if media_type and self.advanced.providers:
             for provider, data in self.advanced.providers.iteritems():
-                if provider not in providers or not providers_by_prefs[provider]:
+                if provider not in providers or not providers_by_prefs[provider] or provider in providers_forced_off:
                     continue
 
                 if data["enabled_for"] is not None:
@@ -752,6 +755,9 @@ class Config(object):
                                                'timeout': self.advanced.providers.opensubtitles.timeout or 15
                                                },
                              'podnapisi': {
+                                 'only_foreign': self.forced_only,
+                             },
+                             'subscene': {
                                  'only_foreign': self.forced_only,
                              },
                              'legendastv': {'username': Prefs['provider.legendastv.username'],
