@@ -823,7 +823,12 @@ class SubtitleStorageMaintenance(Task):
         self.running = True
         Log.Info(u"%s: Running subtitle storage maintenance", self.name)
         storage = get_subtitle_storage()
-        deleted_items = storage.delete_missing(wanted_languages=set(str(l) for l in config.lang_list))
+        try:
+            deleted_items = storage.delete_missing(wanted_languages=set(str(l) for l in config.lang_list))
+        except OSError:
+            deleted_items = storage.delete_missing(wanted_languages=set(str(l) for l in config.lang_list),
+                                                   scandir_generic=True)
+
         if deleted_items:
             Log.Info(u"%s: Subtitle information for %d non-existant videos have been cleaned up",
                      self.name, len(deleted_items))
@@ -861,11 +866,18 @@ class MigrateSubtitleStorage(Task):
         self.running = True
         Log.Info(u"%s: Running subtitle storage migration", self.name)
         storage = get_subtitle_storage()
-        for fn in storage.get_all_files():
-            if fn.endswith(".json.gz"):
-                continue
-            Log.Debug(u"%s: Migrating %s", self.name, fn)
-            storage.load(None, fn)
+
+        def migrate(scandir_generic=False):
+            for fn in storage.get_all_files(scandir_generic=scandir_generic):
+                if fn.endswith(".json.gz"):
+                    continue
+                Log.Debug(u"%s: Migrating %s", self.name, fn)
+                storage.load(None, fn)
+
+        try:
+            migrate()
+        except OSError:
+            migrate(scandir_generic=True)
 
         storage.destroy()
 

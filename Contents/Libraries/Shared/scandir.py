@@ -42,7 +42,7 @@ if _scandir is None and ctypes is None:
                   "or ctypes, using slow generic fallback")
 
 __version__ = '1.6'
-__all__ = ['scandir', 'walk']
+__all__ = ['scandir', 'scandir_generic', 'walk']
 
 # Windows FILE_ATTRIBUTE constants for interpreting the
 # FIND_DATA.dwFileAttributes member
