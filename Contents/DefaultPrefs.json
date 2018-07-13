@@ -602,7 +602,7 @@
     "id": "subtitles.autoclean",
     "label": "Automatically delete leftover/unused (externally saved) subtitles",
     "type": "bool",
-    "default": "true"
+    "default": "false"
   },
   {
     "id": "activity.on_playback",
