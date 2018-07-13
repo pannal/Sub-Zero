@@ -33,6 +33,9 @@ class CommonFixes(SubtitleTextModification):
         # '' = "
         NReProcessor(re.compile(ur'(?u)([\'’ʼ❜‘‛][\'’ʼ❜‘‛]+)'), u'"', name="CM_double_apostrophe"),
 
+        # double quotes instead of single quotes inside words
+        NReProcessor(re.compile(ur'(?u)([A-zÀ-ž])"([A-zÀ-ž])'), ur"\1'\2", name="CM_double_as_single"),
+
         # normalize quotes
         NReProcessor(re.compile(ur'(?u)(\s*["”“‟„])\s*(["”“‟„]["”“‟„\s]*)'),
                      lambda match: '"' + (" " if match.group(2).endswith(" ") else ""),
