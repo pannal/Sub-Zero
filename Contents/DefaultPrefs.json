@@ -729,14 +729,24 @@
     "default": "2"
   },
   {
-    "id": "subtitles.ignore_fs",
-    "label": "Ignore folders (with \"subzero.ignore/.subzero.ignore/.nosz\" files in them)",
+    "id": "subtitles.include_exclude_mode",
+    "label": "Explicitly enable Sub-Zero and manually ignore items, or disable Sub-Zero and explicitly include items?",
+    "type": "enum",
+    "values": [
+      "manual exclude",
+      "manual include"
+    ],
+    "default": "manual exclude"
+  },
+  {
+    "id": "subtitles.include_exclude_fs",
+    "label": "Enable/disable Sub-Zero for folders (with \"subzero.ignore/.subzero.ignore/.nosz or subzero.include/.sz\" files in them)",
     "type": "bool",
     "default": "false"
   },
   {
-    "id": "subtitles.ignore_paths",
-    "label": "Ignore anything in the following paths (comma-separated)",
+    "id": "subtitles.include_exclude_paths",
+    "label": "Enable/disable Sub-Zero in the following paths (comma-separated)",
     "type": "text",
     "default": ""
   },

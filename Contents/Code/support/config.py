@@ -44,7 +44,8 @@ VIDEO_EXTS = ['3g2', '3gp', 'asf', 'asx', 'avc', 'avi', 'avs', 'bivx', 'bup', 'd
               'wtv', 'xsp', 'xvid',
               'webm']
 
-IGNORE_FN = ("subzero.ignore", ".subzero.ignore", ".nosz")
+EXCLUDE_FN = ("subzero.ignore", ".subzero.ignore", "subzero.exclude", ".subzero.exclude", ".nosz")
+INCLUDE_FN = ("subzero.include", ".subzero.include", ".sz")
 
 VERSION_RE = re.compile(ur'CFBundleVersion.+?<string>([0-9\.]+)</string>', re.DOTALL)
 DEV_RE = re.compile(ur'PlexPluginDevMode.+?<string>([01]+)</string>', re.DOTALL)
@@ -77,7 +78,7 @@ PROVIDER_THROTTLE_MAP = {
 
 
 class Config(object):
-    config_version = 1
+    config_version = 2
     libraries_root = None
     plugin_info = ""
     version = None
@@ -98,6 +99,7 @@ class Config(object):
     advanced = None
     debug_i18n = False
 
+    include = False
     enable_channel = True
     enable_agent = True
     pin = None
@@ -110,8 +112,8 @@ class Config(object):
     max_recent_items_per_library = 200
     permissions_ok = False
     missing_permissions = None
-    ignore_sz_files = False
-    ignore_paths = None
+    include_exclude_sz_files = False
+    include_exclude_paths = None
     fs_encoding = None
     notify_executable = None
     sections = None
@@ -186,14 +188,15 @@ class Config(object):
         self.set_activity_modes()
         self.parse_rename_mode()
 
+        self.include = Prefs["subtitles.include_exclude_mode"] == "manual include"
         self.subtitle_destination_folder = self.get_subtitle_destination_folder()
         self.subtitle_formats = self.get_subtitle_formats()
         self.forced_only = Prefs["subtitles.when"] == "Only foreign/forced"
         self.max_recent_items_per_library = int_or_default(Prefs["scheduler.max_recent_items_per_library"], 2000)
         self.sections = list(Plex["library"].sections())
         self.missing_permissions = []
-        self.ignore_sz_files = cast_bool(Prefs["subtitles.ignore_fs"])
-        self.ignore_paths = self.parse_ignore_paths()
+        self.include_exclude_sz_files = cast_bool(Prefs["subtitles.include_exclude_fs"])
+        self.include_exclude_paths = self.parse_include_exclude_paths()
         self.enabled_sections = self.check_enabled_sections()
         self.permissions_ok = self.check_permissions()
         self.notify_executable = self.check_notify_executable()
@@ -248,6 +251,16 @@ class Config(object):
         update_prefs = {}
         if "subtitles.only_foreign" in user_prefs and user_prefs["subtitles.only_foreign"] == "true":
             update_prefs["subtitles.when"] = "1"
+
+        return update_prefs
+
+    def migrate_prefs_to_2(self, user_prefs, **kwargs):
+        update_prefs = {}
+        if "subtitles.ignore_fs" in user_prefs and user_prefs["subtitles.ignore_fs"] == "true":
+            update_prefs["subtitles.include_exclude_fs"] = "true"
+
+        if "subtitles.ignore_paths" in user_prefs and user_prefs["subtitles.ignore_paths"]:
+            update_prefs["subtitles.include_exclude_paths"] = user_prefs["subtitles.ignore_paths"]
 
         return update_prefs
 
@@ -462,7 +475,8 @@ class Config(object):
             return True
 
         self.missing_permissions = []
-        use_ignore_fs = Prefs["subtitles.ignore_fs"]
+        use_include_exclude_fs = self.include_exclude_sz_files
+        cmp_val = self.include
         all_permissions_ok = True
         for section in self.sections:
             if section.key not in self.enabled_sections:
@@ -477,12 +491,12 @@ class Config(object):
                 if not os.path.exists(path_str):
                     continue
 
-                if use_ignore_fs:
+                if use_include_exclude_fs:
                     # check whether we've got an ignore file inside the section path
-                    if self.is_physically_ignored(path_str):
+                    if self.is_physically_wanted(path_str) == cmp_val:
                         continue
 
-                if self.is_path_ignored(path_str):
+                if self.is_path_wanted(path_str) == cmp_val:
                     # is the path in our ignored paths setting?
                     continue
 
@@ -517,29 +531,32 @@ class Config(object):
         info_file_path = os.path.abspath(os.path.join(curDir, "..", "..", "Info.plist"))
         return FileIO.read(info_file_path)
 
-    def parse_ignore_paths(self):
-        paths = Prefs["subtitles.ignore_paths"]
+    def parse_include_exclude_paths(self):
+        paths = Prefs["subtitles.include_exclude_paths"]
         if paths:
             try:
                 return [path.strip() for path in paths.split(",")]
             except:
-                Log.Error("Couldn't parse your ignore paths settings: %s" % paths)
+                Log.Error("Couldn't parse your include/exclude paths settings: %s" % paths)
         return []
 
-    def is_physically_ignored(self, folder):
+    def is_physically_wanted(self, folder):
         # check whether we've got an ignore file inside the path
-        for ifn in IGNORE_FN:
+        ret_val = self.include
+        ref_list = INCLUDE_FN if self.include else EXCLUDE_FN
+        for ifn in ref_list:
             if os.path.isfile(os.path.join(folder, ifn)):
-                Log.Info(u'Ignoring "%s" because "%s" exists', folder, ifn)
-                return True
+                Log.Info(u'%s "%s" because "%s" exists', "Including" if self.include else "Ignoring", folder, ifn)
+                return ret_val
 
-        return False
+        return not ret_val
 
-    def is_path_ignored(self, fn):
-        for path in self.ignore_paths:
+    def is_path_wanted(self, fn):
+        ret_val = self.include
+        for path in self.include_exclude_paths:
             if fn.startswith(path):
-                return True
-        return False
+                return ret_val
+        return not ret_val
 
     def check_notify_executable(self):
         fn = Prefs["notify_executable"]

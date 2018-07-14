@@ -4,7 +4,7 @@ from subzero.constants import PREFIX, TITLE, ART
 from support.config import config
 from support.helpers import pad_title, timestamp, df, display_language
 from support.scheduler import scheduler
-from support.ignore import ignore_list
+from support.ignore import exclude_list
 from support.items import get_item_thumb, get_on_deck_items, get_all_items, get_items_info, get_item, get_item_title
 from menu_helpers import main_icon, debounce, SubFolderObjectContainer, default_thumb, dig_tree, add_ignore_options, \
     ObjectContainer, route, handler
@@ -136,7 +136,7 @@ def fatality(randomize=None, force_title=None, header=None, message=None, only_r
 
         oc.add(DirectoryObject(
             key=Callback(IgnoreListMenu),
-            title=_("Display ignore list (%(ignored_count)d)", ignored_count=len(ignore_list)),
+            title=_("Display ignore list (%(ignored_count)d)", ignored_count=len(exclude_list)),
             summary=_("Show the current ignore list (mainly used for the automatic tasks)"),
             thumb=R("icon-ignore.jpg")
         ))
@@ -325,14 +325,14 @@ def IgnoreMenu(kind, rating_key, title=None, sure=False, todo="not_set"):
     :param todo:
     :return:
     """
-    is_ignored = rating_key in ignore_list[kind]
+    is_ignored = rating_key in exclude_list[kind]
     if not sure:
         t = u"Add %(kind)s %(title)s to the ignore list"
         if is_ignored:
             t = u"Remove %(kind)s %(title)s from the ignore list"
         oc = SubFolderObjectContainer(no_history=True, replace_parent=True,
                                       title1=_(t,
-                                               kind=ignore_list.verbose(kind),
+                                               kind=exclude_list.verbose(kind),
                                                title=title
                                                ),
                                       title2=_("Are you sure?"))
@@ -343,7 +343,7 @@ def IgnoreMenu(kind, rating_key, title=None, sure=False, todo="not_set"):
         ))
         return oc
 
-    rel = ignore_list[kind]
+    rel = exclude_list[kind]
     dont_change = False
     state = None
     if todo == "remove":
@@ -352,16 +352,16 @@ def IgnoreMenu(kind, rating_key, title=None, sure=False, todo="not_set"):
         else:
             rel.remove(rating_key)
             Log.Info("Removed %s (%s) from the ignore list", title, rating_key)
-            ignore_list.remove_title(kind, rating_key)
-            ignore_list.save()
+            exclude_list.remove_title(kind, rating_key)
+            exclude_list.save()
     elif todo == "add":
         if is_ignored:
             dont_change = True
         else:
             rel.append(rating_key)
             Log.Info("Added %s (%s) to the ignore list", title, rating_key)
-            ignore_list.add_title(kind, rating_key, title)
-            ignore_list.save()
+            exclude_list.add_title(kind, rating_key, title)
+            exclude_list.save()
     else:
         dont_change = True
 

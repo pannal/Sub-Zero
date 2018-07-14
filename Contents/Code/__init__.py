@@ -26,7 +26,7 @@ from interface.menu import *
 from support.plex_media import media_to_videos, get_media_item_ids
 from support.scanning import scan_videos
 from support.storage import save_subtitles, store_subtitle_info, get_subtitle_storage
-from support.items import is_ignored
+from support.items import is_wanted
 from support.config import config
 from support.lib import get_intent
 from support.helpers import track_usage, get_title_for_video_metadata, get_identifier, cast_bool, \
@@ -204,7 +204,7 @@ class SubZeroAgent(object):
             # media ignored?
             use_any_parts = False
             for video in videos:
-                if is_ignored(video["id"]):
+                if not is_wanted(video["id"]):
                     Log.Debug(u"Ignoring %s" % video)
                     continue
                 use_any_parts = True

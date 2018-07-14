@@ -16,7 +16,7 @@ from missing_subtitles import items_get_all_missing_subs, refresh_item
 from scheduler import scheduler
 from storage import save_subtitles, get_subtitle_storage
 from support.config import config
-from support.items import get_recent_items, get_item, is_ignored, get_item_title
+from support.items import get_recent_items, get_item, is_wanted, get_item_title
 from support.helpers import track_usage, get_title_for_video_metadata, cast_bool, PartUnknownException
 from support.plex_media import get_plex_metadata
 from support.scanning import scan_videos
@@ -421,7 +421,7 @@ class SearchAllRecentlyAddedMissing(Task):
                     skip_item()
                     continue
 
-                if is_ignored(video_id, item=plex_item):
+                if not is_wanted(video_id, item=plex_item):
                     skip_item()
                     continue
 
@@ -558,7 +558,7 @@ class LegacySearchAllRecentlyAddedMissing(Task):
         self.items_done = []
         recent_items = get_recent_items()
         missing = items_get_all_missing_subs(recent_items, sleep_after_request=0.2)
-        ids = set([id for added_at, id, title, item, missing_languages in missing if not is_ignored(id, item=item)])
+        ids = set([id for added_at, id, title, item, missing_languages in missing if is_wanted(id, item=item)])
         self.items_searching = missing
         self.items_searching_ids = ids
         self.items_failed = []

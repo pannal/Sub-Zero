@@ -21,7 +21,7 @@ from support.plex_media import get_all_parts, get_embedded_subtitle_streams
 from support.scheduler import scheduler
 from support.config import config
 from support.helpers import timestamp, df, display_language
-from support.ignore import ignore_list
+from support.ignore import exclude_list
 from support.items import get_all_items, get_items_info, get_item_kind_from_rating_key, get_item, MI_KEY, get_item_title
 from support.storage import get_subtitle_storage
 from support.i18n import _
@@ -221,10 +221,10 @@ def season_extract_embedded(rating_key, requested_language, with_mods=False, for
 @route(PREFIX + '/ignore_list')
 def IgnoreListMenu():
     oc = SubFolderObjectContainer(title2="Ignore list", replace_parent=True)
-    for key in ignore_list.key_order:
-        values = ignore_list[key]
+    for key in exclude_list.key_order:
+        values = exclude_list[key]
         for value in values:
-            add_ignore_options(oc, key, title=ignore_list.get_title(key, value), rating_key=value,
+            add_ignore_options(oc, key, title=exclude_list.get_title(key, value), rating_key=value,
                                callback_menu=IgnoreMenu)
     return oc
 

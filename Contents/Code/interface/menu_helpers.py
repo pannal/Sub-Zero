@@ -11,7 +11,7 @@ from subzero.language import Language
 from support.i18n import is_localized_string, _
 from support.items import get_kind, get_item_thumb, get_item, get_item_kind_from_item, refresh_item
 from support.helpers import get_video_display_title, pad_title, display_language, quote_args, is_stream_forced
-from support.ignore import ignore_list
+from support.ignore import exclude_list
 from support.lib import get_intent
 from support.config import config
 from subzero.constants import ICON_SUB, ICON
@@ -43,12 +43,12 @@ def add_ignore_options(oc, kind, callback_menu=None, title=None, rating_key=None
     """
     # try to translate kind to the ignore key
     use_kind = kind
-    if kind not in ignore_list:
-        use_kind = ignore_list.translate_key(kind)
-    if not use_kind or use_kind not in ignore_list:
+    if kind not in exclude_list:
+        use_kind = exclude_list.translate_key(kind)
+    if not use_kind or use_kind not in exclude_list:
         return
 
-    in_list = rating_key in ignore_list[use_kind]
+    in_list = rating_key in exclude_list[use_kind]
 
     t = u"Ignore %(kind)s \"%(title)s\""
     if in_list:
@@ -57,7 +57,7 @@ def add_ignore_options(oc, kind, callback_menu=None, title=None, rating_key=None
     oc.add(DirectoryObject(
         key=Callback(callback_menu, kind=use_kind, sure=False, todo="not_set", rating_key=rating_key, title=title),
         title=_(t,
-                kind=ignore_list.verbose(kind) if add_kind else "",
+                kind=exclude_list.verbose(kind) if add_kind else "",
                 title=unicode(title))
     )
     )

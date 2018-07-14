@@ -10,10 +10,10 @@ import time
 
 import datetime
 
-from ignore import ignore_list
+from ignore import get_decision_list
 from helpers import is_recent, get_plex_item_display_title, query_plex, PartUnknownException
 from lib import Plex, get_intent
-from config import config, IGNORE_FN
+from config import config
 from subliminal_patch.subtitle import ModifiedSubtitle
 from subzero.modification import registry as mod_registry, SubtitleModifications
 from socket import timeout
@@ -209,10 +209,13 @@ def get_recent_items():
     available_keys = ("key", "title", "parent_key", "parent_title", "season", "episode", "added", "filename")
     recent = []
 
+    ref_list = get_decision_list()
+
     for section in Plex["library"].sections():
         if section.type not in ("movie", "show") \
                 or section.key not in config.enabled_sections \
-                or section.key in ignore_list.sections:
+                or ((section.key not in ref_list.sections and config.include)
+                    or (section.key in ref_list.sections and not config.include)):
             Log.Debug(u"Skipping section: %s" % section.title)
             continue
 
@@ -229,13 +232,15 @@ def get_recent_items():
         matches = [m.groupdict() for m in matcher.finditer(response.content)]
         for match in matches:
             data = dict((key, match[key] if key in match else None) for key in available_keys)
-            if section.type == "show" and data["parent_key"] in ignore_list.series:
+            if section.type == "show" and ((data["parent_key"] not in ref_list.series and config.include) or
+                                           (data["parent_key"] in ref_list.series and not config.include)):
                 Log.Debug(u"Skipping series: %s" % data["parent_title"])
                 continue
-            if data["key"] in ignore_list.videos:
+            if (data["key"] not in ref_list.videos and config.include) or \
+                    (data["key"] in ref_list.videos and not config.include):
                 Log.Debug(u"Skipping item: %s" % data["title"])
                 continue
-            if is_physically_ignored(data["filename"], plex_item_type):
+            if not is_physically_wanted(data["filename"], plex_item_type):
                 Log.Debug(u"Skipping item: %s" % data["title"])
                 continue
 
@@ -257,63 +262,69 @@ def get_all_items(key, base="library", value=None, flat=False):
     return get_items(key, base=base, value=value, flat=flat)
 
 
-def is_ignored(rating_key, item=None):
+def is_wanted(rating_key, item=None):
     """
     check whether an item, its show/season/section is in the soft or the hard ignore list
     :param rating_key:
     :param item:
     :return:
     """
-    # item in soft ignore list
-    if ignore_list["videos"] and rating_key in ignore_list["videos"]:
-        Log.Debug("Item %s is in the soft ignore list" % rating_key)
-        return True
+
+    ref_list = get_decision_list()
+    ret_val = ref_list.store == "include"
+    inc_exc_verbose = "exclude" if not ret_val else "include"
+
+    # item in soft include/exclude list
+    if ref_list["videos"] and rating_key in ref_list["videos"]:
+        Log.Debug("Item %s is in the soft %s list" % (rating_key, inc_exc_verbose))
+        return ret_val
 
     item = item or get_item(rating_key)
     kind = get_item_kind(item)
 
-    # show in soft ignore list
-    if kind == "Episode" and ignore_list["series"] and item.show.rating_key in ignore_list["series"]:
-        Log.Debug("Item %s's show is in the soft ignore list" % rating_key)
-        return True
+    # show in soft include/exclude list
+    if kind == "Episode" and ref_list["series"] and item.show.rating_key in ref_list["series"]:
+        Log.Debug("Item %s's show is in the soft %s list" % (rating_key, inc_exc_verbose))
+        return ret_val
 
-    # season in soft ignore list
-    if kind == "Episode" and ignore_list["seasons"] and item.season.rating_key in ignore_list["seasons"]:
-        Log.Debug("Item %s's season is in the soft ignore list" % rating_key)
-        return True
+    # season in soft include/exclude list
+    if kind == "Episode" and ref_list["seasons"] and item.season.rating_key in ref_list["seasons"]:
+        Log.Debug("Item %s's season is in the soft %s list" % (rating_key, inc_exc_verbose))
+        return ret_val
 
-    # section in soft ignore list
-    if ignore_list["sections"] and item.section.key in ignore_list["sections"]:
-        Log.Debug("Item %s's section is in the soft ignore list" % rating_key)
-        return True
+    # section in soft include/exclude list
+    if ref_list["sections"] and item.section.key in ref_list["sections"]:
+        Log.Debug("Item %s's section is in the soft %s list" % (rating_key, inc_exc_verbose))
+        return ret_val
 
-    # physical/path ignore
-    if config.ignore_sz_files or config.ignore_paths:
+    # physical/path include/exclude
+    if config.include_exclude_sz_files or config.include_exclude_paths:
         for media in item.media:
             for part in media.parts:
-                if is_physically_ignored(part.file, kind):
-                    return True
+                if is_physically_wanted(part.file, kind):
+                    return ret_val
 
-    return False
+    return not ret_val
 
 
-def is_physically_ignored(fn, kind):
-    if config.ignore_sz_files or config.ignore_paths:
+def is_physically_wanted(fn, kind):
+    ret_val = config.include
+    if config.include_exclude_sz_files or config.include_exclude_paths:
         # normally check current item folder and the library
-        check_ignore_paths = [".", "../"]
+        check_paths = [".", "../"]
         if kind == "Episode":
             # series/episode, we've got a season folder here, also
-            check_ignore_paths.append("../../")
+            check_paths.append("../../")
 
-        if config.ignore_paths and config.is_path_ignored(fn):
-            Log.Debug("Item %s's path is manually ignored" % fn)
-            return True
+        if config.include_exclude_paths and config.is_path_wanted(fn):
+            Log.Debug("Item %s's path is manually %s" % (fn, "included" if ret_val else "excluded"))
+            return ret_val
 
-        if config.ignore_sz_files:
-            for sub_path in check_ignore_paths:
-                if config.is_physically_ignored(os.path.normpath(os.path.join(os.path.dirname(fn), sub_path))):
-                    Log.Debug("An ignore file exists in either the items or its parent folders")
-                    return True
+        if config.include_exclude_sz_files:
+            for sub_path in check_paths:
+                if config.is_physically_wanted(os.path.normpath(os.path.join(os.path.dirname(fn), sub_path))):
+                    Log.Debug("An include/exclude indicator file exists in either the items or its parent folders")
+                    return ret_val
 
 
 def refresh_item(rating_key, force=False, timeout=8000, refresh_kind=None, parent_rating_key=None):
