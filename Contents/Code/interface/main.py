@@ -100,7 +100,7 @@ def fatality(randomize=None, force_title=None, header=None, message=None, only_r
         oc.add(DirectoryObject(
             key=Callback(RecentMissingSubtitlesMenu, randomize=timestamp()),
             title=_("Show recently added items with missing subtitles"),
-            summary=_("Lists items with missing subtitles. Click on Find recent items with missing subs to update list"),
+            summary=_("Lists items with missing subtitles. Click on \"Find recent items with missing subs\" to update list"),
             thumb=R("icon-missing.jpg")
         ))
         oc.add(DirectoryObject(
