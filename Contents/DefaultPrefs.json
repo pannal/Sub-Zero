@@ -730,7 +730,7 @@
   },
   {
     "id": "subtitles.include_exclude_mode",
-    "label": "Explicitly enable Sub-Zero and manually ignore items, or disable Sub-Zero and explicitly include items?",
+    "label": "Do you want to manually exclude items SZ should work with, or manually include them? (inverts the settings below)",
     "type": "enum",
     "values": [
       "manual exclude",
