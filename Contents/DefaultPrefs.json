@@ -730,7 +730,7 @@
   },
   {
     "id": "subtitles.include_exclude_mode",
-    "label": "Do you want to manually exclude items SZ should work with, or manually include them? (impacts the settings below)",
+    "label": "Do you want to manually exclude or include items SZ should work with? (impacts the settings below and the plugin menu)",
     "type": "enum",
     "values": [
       "manual exclude",
@@ -739,16 +739,16 @@
     "default": "manual exclude"
   },
   {
+    "id": "subtitles.include_exclude_paths",
+    "label": "Enable/disable Sub-Zero in the following paths (comma-separated; the setting above impact this)",
+    "type": "text",
+    "default": ""
+  },
+  {
     "id": "subtitles.include_exclude_fs",
     "label": "Use \"subzero.ignore/.subzero.ignore/.nosz\" (exclude) or \"subzero.include/.subzero.include/.sz\" (include) files inside folders",
     "type": "bool",
     "default": "false"
-  },
-  {
-    "id": "subtitles.include_exclude_paths",
-    "label": "Enable/disable Sub-Zero in the following paths (comma-separated)",
-    "type": "text",
-    "default": ""
   },
   {
     "id": "plugin_mode2",
