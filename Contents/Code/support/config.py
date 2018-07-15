@@ -476,7 +476,6 @@ class Config(object):
 
         self.missing_permissions = []
         use_include_exclude_fs = self.include_exclude_sz_files
-        cmp_val = self.include
         all_permissions_ok = True
         for section in self.sections:
             if section.key not in self.enabled_sections:
@@ -493,10 +492,10 @@ class Config(object):
 
                 if use_include_exclude_fs:
                     # check whether we've got an ignore file inside the section path
-                    if self.is_physically_wanted(path_str) == cmp_val:
+                    if not self.is_physically_wanted(path_str):
                         continue
 
-                if self.is_path_wanted(path_str) == cmp_val:
+                if not self.is_path_wanted(path_str):
                     # is the path in our ignored paths setting?
                     continue
 

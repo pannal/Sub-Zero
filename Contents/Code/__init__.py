@@ -205,7 +205,7 @@ class SubZeroAgent(object):
             use_any_parts = False
             for video in videos:
                 if not is_wanted(video["id"]):
-                    Log.Debug(u"Ignoring %s" % video)
+                    Log.Debug(u"Skipping %s" % video)
                     continue
                 use_any_parts = True
 
