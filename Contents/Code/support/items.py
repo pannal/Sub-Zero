@@ -301,8 +301,7 @@ def is_wanted(rating_key, item=None):
     if config.include_exclude_sz_files or config.include_exclude_paths:
         for media in item.media:
             for part in media.parts:
-                if is_physically_wanted(part.file, kind):
-                    return True
+                return is_physically_wanted(part.file, kind)
 
     return not ret_val
 
@@ -315,13 +314,12 @@ def is_physically_wanted(fn, kind):
             # series/episode, we've got a season folder here, also
             check_paths.append("../../")
 
-        if config.include_exclude_paths and config.is_path_wanted(fn):
-            return True
-
         if config.include_exclude_sz_files:
             for sub_path in check_paths:
-                if config.is_physically_wanted(os.path.normpath(os.path.join(os.path.dirname(fn), sub_path))):
-                    return True
+                return config.is_physically_wanted(os.path.normpath(os.path.join(os.path.dirname(fn), sub_path)))
+
+        if config.include_exclude_paths and config.is_path_wanted(fn):
+            return True
 
 
 def refresh_item(rating_key, force=False, timeout=8000, refresh_kind=None, parent_rating_key=None):

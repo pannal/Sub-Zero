@@ -730,7 +730,7 @@
   },
   {
     "id": "subtitles.include_exclude_mode",
-    "label": "Do you want to manually exclude items SZ should work with, or manually include them? (inverts the settings below)",
+    "label": "Do you want to manually exclude items SZ should work with, or manually include them? (impacts the settings below)",
     "type": "enum",
     "values": [
       "manual exclude",
@@ -740,7 +740,7 @@
   },
   {
     "id": "subtitles.include_exclude_fs",
-    "label": "Enable/disable Sub-Zero for folders (with \"subzero.ignore/.subzero.ignore/.nosz or subzero.include/.sz\" files in them)",
+    "label": "Use \"subzero.ignore/.subzero.ignore/.nosz\" (exclude) or \"subzero.include/.subzero.include/.sz\" (include) files inside folders",
     "type": "bool",
     "default": "false"
   },
