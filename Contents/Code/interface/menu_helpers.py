@@ -55,7 +55,7 @@ def add_ignore_options(oc, kind, callback_menu=None, title=None, rating_key=None
         t = u"Un-ignore %(kind)s \"%(title)s\""
 
     oc.add(DirectoryObject(
-        key=Callback(callback_menu, kind=use_kind, sure=False, todo="not_set", rating_key=rating_key, title=title),
+        key=Callback(callback_menu, kind=use_kind, sure=False, todo="not_set", rating_key=str(rating_key), title=title),
         title=_(t,
                 kind=exclude_list.verbose(kind) if add_kind else "",
                 title=unicode(title))
