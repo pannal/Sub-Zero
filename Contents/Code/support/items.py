@@ -320,8 +320,8 @@ def is_physically_wanted(fn, kind):
                 wanted_results.append(config.is_physically_wanted(os.path.normpath(os.path.join(os.path.dirname(fn),
                                                                                                 sub_path))))
 
-        if config.include_exclude_paths and config.is_path_wanted(fn):
-            wanted_results.append(True)
+        if config.include_exclude_paths:
+            wanted_results.append(config.is_path_wanted(fn))
 
         if config.include and any(wanted_results):
             return True
