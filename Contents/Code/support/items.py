@@ -320,15 +320,15 @@ def is_physically_wanted(fn, kind):
                 wanted_results.append(config.is_physically_wanted(os.path.normpath(os.path.join(os.path.dirname(fn),
                                                                                                 sub_path))))
 
-            if config.include and any(wanted_results):
-                return True
-            elif not config.include and not all(wanted_results):
-                return False
-            else:
-                return True
-
         if config.include_exclude_paths and config.is_path_wanted(fn):
+            wanted_results.append(True)
+
+        if config.include and any(wanted_results):
             return True
+        elif not config.include and not all(wanted_results):
+            return False
+
+        return True
 
 
 def refresh_item(rating_key, force=False, timeout=8000, refresh_kind=None, parent_rating_key=None):
