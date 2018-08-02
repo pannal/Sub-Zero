@@ -18,6 +18,9 @@ class CommonFixes(SubtitleTextModification):
     long_description = "Fix common and whitespace/punctuation issues in subtitles"
 
     processors = [
+        # normalize hyphens
+        NReProcessor(re.compile(ur'(?u)([‑‐﹘﹣])'), u"-", name="CM_hyphens"),
+
         # -- = em dash
         NReProcessor(re.compile(r'(?u)(\w|\b|\s|^)(-\s?-{1,2})'), ur"\1—", name="CM_multidash"),
 
