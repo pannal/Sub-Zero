@@ -329,11 +329,14 @@ def checked(fn):
     """
     response = None
     try:
-        response = fn()
-    except requests.RequestException as e:
-        status_code = e.response.status_code
-    else:
-        status_code = int(response['status'][:3])
+        try:
+            response = fn()
+        except requests.RequestException as e:
+            status_code = e.response.status_code
+        else:
+            status_code = int(response['status'][:3])
+    except:
+        status_code = None
 
     if status_code == 401:
         raise Unauthorized
@@ -352,6 +355,8 @@ def checked(fn):
     if status_code == 503:
         raise ServiceUnavailable
     if status_code != 200:
-        raise OpenSubtitlesError(response['status'])
+        if response and "status" in response:
+            raise OpenSubtitlesError(response['status'])
+        raise OpenSubtitlesError("Unknown Error")
 
     return response
