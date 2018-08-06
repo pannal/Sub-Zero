@@ -357,6 +357,6 @@ def checked(fn):
     if status_code != 200:
         if response and "status" in response:
             raise OpenSubtitlesError(response['status'])
-        raise OpenSubtitlesError("Unknown Error")
+        raise ServiceUnavailable("Unknown Error, empty response")
 
     return response
