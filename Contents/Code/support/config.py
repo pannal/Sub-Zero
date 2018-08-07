@@ -24,6 +24,7 @@ from subzero.lib.io import FileIO, get_viable_encoding
 from subzero.lib.dict import Dicked
 from subzero.util import get_root_path
 from subzero.constants import PLUGIN_NAME, PLUGIN_IDENTIFIER, MOVIE, SHOW, MEDIA_TYPE_TO_STRING
+from subzero.prefs import get_user_prefs, update_user_prefs
 from dogpile.cache.region import register_backend as register_cache_backend
 from lib import Plex
 from helpers import check_write_permissions, cast_bool, cast_int, mswindows
@@ -43,7 +44,8 @@ VIDEO_EXTS = ['3g2', '3gp', 'asf', 'asx', 'avc', 'avi', 'avs', 'bivx', 'bup', 'd
               'wtv', 'xsp', 'xvid',
               'webm']
 
-IGNORE_FN = ("subzero.ignore", ".subzero.ignore", ".nosz")
+EXCLUDE_FN = ("subzero.ignore", ".subzero.ignore", "subzero.exclude", ".subzero.exclude", ".nosz")
+INCLUDE_FN = ("subzero.include", ".subzero.include", ".sz")
 
 VERSION_RE = re.compile(ur'CFBundleVersion.+?<string>([0-9\.]+)</string>', re.DOTALL)
 DEV_RE = re.compile(ur'PlexPluginDevMode.+?<string>([01]+)</string>', re.DOTALL)
@@ -76,6 +78,7 @@ PROVIDER_THROTTLE_MAP = {
 
 
 class Config(object):
+    config_version = 2
     libraries_root = None
     plugin_info = ""
     version = None
@@ -96,6 +99,7 @@ class Config(object):
     advanced = None
     debug_i18n = False
 
+    include = False
     enable_channel = True
     enable_agent = True
     pin = None
@@ -108,8 +112,8 @@ class Config(object):
     max_recent_items_per_library = 200
     permissions_ok = False
     missing_permissions = None
-    ignore_sz_files = False
-    ignore_paths = None
+    include_exclude_sz_files = False
+    include_exclude_paths = None
     fs_encoding = None
     notify_executable = None
     sections = None
@@ -163,6 +167,11 @@ class Config(object):
         self.data_items_path = os.path.join(self.data_path, "DataItems")
         self.universal_plex_token = self.get_universal_plex_token()
         self.plex_token = os.environ.get("PLEXTOKEN", self.universal_plex_token)
+        try:
+            self.migrate_prefs()
+        except:
+            Log.Exception("Catastrophic failure when running prefs migration")
+
         subzero.constants.DEFAULT_TIMEOUT = lib.DEFAULT_TIMEOUT = self.pms_request_timeout = \
             min(cast_int(Prefs['pms_request_timeout'], 15), 45)
         self.low_impact_mode = cast_bool(Prefs['low_impact_mode'])
@@ -179,14 +188,15 @@ class Config(object):
         self.set_activity_modes()
         self.parse_rename_mode()
 
+        self.include = Prefs["subtitles.include_exclude_mode"] == "manual include"
         self.subtitle_destination_folder = self.get_subtitle_destination_folder()
         self.subtitle_formats = self.get_subtitle_formats()
-        self.forced_only = cast_bool(Prefs["subtitles.only_foreign"])
+        self.forced_only = Prefs["subtitles.when"] == "Only foreign/forced"
         self.max_recent_items_per_library = int_or_default(Prefs["scheduler.max_recent_items_per_library"], 2000)
         self.sections = list(Plex["library"].sections())
         self.missing_permissions = []
-        self.ignore_sz_files = cast_bool(Prefs["subtitles.ignore_fs"])
-        self.ignore_paths = self.parse_ignore_paths()
+        self.include_exclude_sz_files = cast_bool(Prefs["subtitles.include_exclude_fs"])
+        self.include_exclude_paths = self.parse_include_exclude_paths()
         self.enabled_sections = self.check_enabled_sections()
         self.permissions_ok = self.check_permissions()
         self.notify_executable = self.check_notify_executable()
@@ -209,6 +219,50 @@ class Config(object):
         self.embedded_auto_extract = cast_bool(Prefs["subtitles.embedded.autoextract"])
         self.ietf_as_alpha3 = cast_bool(Prefs["subtitles.language.ietf_normalize"])
         self.initialized = True
+
+    def migrate_prefs(self):
+        config_version = 0 if "config_version" not in Dict else Dict["config_version"]
+        if config_version < self.config_version:
+            user_prefs = get_user_prefs(Prefs, Log)
+            if user_prefs:
+                update_prefs = {}
+                for i in range(config_version, self.config_version):
+                    version = i+1
+                    func = "migrate_prefs_to_%i" % version
+                    if hasattr(self, func):
+                        Log.Info("Migrating user prefs to version %i" % version)
+                        try:
+                            mig_result = getattr(self, func)(user_prefs, from_version=config_version,
+                                                             to_version=version,
+                                                             current_version=self.config_version,
+                                                             migrated_prefs=update_prefs)
+                            update_prefs.update(mig_result)
+                            Dict["config_version"] = version
+                            Dict.Save()
+                            Log.Info("User prefs migrated to version %i" % version)
+                        except:
+                            Log.Exception("User prefs migration from %i to %i failed" % (self.config_version, version))
+                            break
+
+                if update_prefs:
+                    update_user_prefs(update_prefs, Prefs, Log)
+
+    def migrate_prefs_to_1(self, user_prefs, **kwargs):
+        update_prefs = {}
+        if "subtitles.only_foreign" in user_prefs and user_prefs["subtitles.only_foreign"] == "true":
+            update_prefs["subtitles.when"] = "1"
+
+        return update_prefs
+
+    def migrate_prefs_to_2(self, user_prefs, **kwargs):
+        update_prefs = {}
+        if "subtitles.ignore_fs" in user_prefs and user_prefs["subtitles.ignore_fs"] == "true":
+            update_prefs["subtitles.include_exclude_fs"] = "true"
+
+        if "subtitles.ignore_paths" in user_prefs and user_prefs["subtitles.ignore_paths"]:
+            update_prefs["subtitles.include_exclude_paths"] = user_prefs["subtitles.ignore_paths"]
+
+        return update_prefs
 
     def init_libraries(self):
         try_executables = []
@@ -421,7 +475,7 @@ class Config(object):
             return True
 
         self.missing_permissions = []
-        use_ignore_fs = Prefs["subtitles.ignore_fs"]
+        use_include_exclude_fs = self.include_exclude_sz_files
         all_permissions_ok = True
         for section in self.sections:
             if section.key not in self.enabled_sections:
@@ -436,12 +490,12 @@ class Config(object):
                 if not os.path.exists(path_str):
                     continue
 
-                if use_ignore_fs:
+                if use_include_exclude_fs:
                     # check whether we've got an ignore file inside the section path
-                    if self.is_physically_ignored(path_str):
+                    if not self.is_physically_wanted(path_str):
                         continue
 
-                if self.is_path_ignored(path_str):
+                if not self.is_path_wanted(path_str):
                     # is the path in our ignored paths setting?
                     continue
 
@@ -476,29 +530,32 @@ class Config(object):
         info_file_path = os.path.abspath(os.path.join(curDir, "..", "..", "Info.plist"))
         return FileIO.read(info_file_path)
 
-    def parse_ignore_paths(self):
-        paths = Prefs["subtitles.ignore_paths"]
+    def parse_include_exclude_paths(self):
+        paths = Prefs["subtitles.include_exclude_paths"]
         if paths:
             try:
                 return [path.strip() for path in paths.split(",")]
             except:
-                Log.Error("Couldn't parse your ignore paths settings: %s" % paths)
+                Log.Error("Couldn't parse your include/exclude paths settings: %s" % paths)
         return []
 
-    def is_physically_ignored(self, folder):
+    def is_physically_wanted(self, folder):
         # check whether we've got an ignore file inside the path
-        for ifn in IGNORE_FN:
+        ret_val = self.include
+        ref_list = INCLUDE_FN if self.include else EXCLUDE_FN
+        for ifn in ref_list:
             if os.path.isfile(os.path.join(folder, ifn)):
-                Log.Info(u'Ignoring "%s" because "%s" exists', folder, ifn)
-                return True
+                Log.Info(u'%s "%s" because "%s" exists', "Including" if self.include else "Ignoring", folder, ifn)
+                return ret_val
 
-        return False
+        return not ret_val
 
-    def is_path_ignored(self, fn):
-        for path in self.ignore_paths:
+    def is_path_wanted(self, fn):
+        ret_val = self.include
+        for path in self.include_exclude_paths:
             if fn.startswith(path):
-                return True
-        return False
+                return ret_val
+        return not ret_val
 
     def check_notify_executable(self):
         fn = Prefs["notify_executable"]
@@ -657,6 +714,7 @@ class Config(object):
             providers["subscene"] = False
 
         # ditch non-forced-subtitles-reporting providers
+        providers_forced_off = {}
         if self.forced_only:
             providers["addic7ed"] = False
             providers["tvsubtitles"] = False
@@ -668,6 +726,8 @@ class Config(object):
             providers["titlovi"] = False
             providers["argenteam"] = False
             providers["assrt"] = False
+            providers["subscene"] = False
+            providers_forced_off = dict(providers)
 
         if not self.unrar and providers["legendastv"]:
             providers["legendastv"] = False
@@ -676,7 +736,7 @@ class Config(object):
         # advanced settings
         if media_type and self.advanced.providers:
             for provider, data in self.advanced.providers.iteritems():
-                if provider not in providers or not providers_by_prefs[provider]:
+                if provider not in providers or not providers_by_prefs[provider] or provider in providers_forced_off:
                     continue
 
                 if data["enabled_for"] is not None:
@@ -722,6 +782,9 @@ class Config(object):
                                                'timeout': self.advanced.providers.opensubtitles.timeout or 15
                                                },
                              'podnapisi': {
+                                 'only_foreign': self.forced_only,
+                             },
+                             'subscene': {
                                  'only_foreign': self.forced_only,
                              },
                              'legendastv': {'username': Prefs['provider.legendastv.username'],

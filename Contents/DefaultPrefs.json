@@ -179,10 +179,18 @@
     "default": "None"
   },
   {
-    "id": "subtitles.only_foreign",
-    "label": "Only download foreign/forced subtitles",
-    "type": "bool",
-    "default": "false"
+    "id": "subtitles.when",
+    "label": "Download subtitles",
+    "type": "enum",
+    "values": [
+      "Always",
+      "Only foreign/forced",
+      "When main audio stream is not Subtitle Language (1)",
+      "When main audio stream is not any configured language",
+      "When any audio stream is not Subtitle Language (1)",
+      "When any audio stream is not any configured language"
+    ],
+    "default": "Always"
   },
   {
     "id": "subtitles.language.ietf_display",
@@ -594,7 +602,7 @@
     "id": "subtitles.autoclean",
     "label": "Automatically delete leftover/unused (externally saved) subtitles",
     "type": "bool",
-    "default": "true"
+    "default": "false"
   },
   {
     "id": "activity.on_playback",
@@ -721,16 +729,26 @@
     "default": "2"
   },
   {
-    "id": "subtitles.ignore_fs",
-    "label": "Ignore folders (with \"subzero.ignore/.subzero.ignore/.nosz\" files in them)",
-    "type": "bool",
-    "default": "false"
+    "id": "subtitles.include_exclude_mode",
+    "label": "Do you want to manually exclude or include items SZ should work with? (impacts the settings below and the plugin menu)",
+    "type": "enum",
+    "values": [
+      "manual exclude",
+      "manual include"
+    ],
+    "default": "manual exclude"
   },
   {
-    "id": "subtitles.ignore_paths",
-    "label": "Ignore anything in the following paths (comma-separated)",
+    "id": "subtitles.include_exclude_paths",
+    "label": "Enable/disable Sub-Zero in the following paths (comma-separated; the setting above impact this)",
     "type": "text",
     "default": ""
+  },
+  {
+    "id": "subtitles.include_exclude_fs",
+    "label": "Use \"subzero.ignore/.subzero.ignore/.nosz\" (exclude) or \"subzero.include/.subzero.include/.sz\" (include) files inside folders",
+    "type": "bool",
+    "default": "false"
   },
   {
     "id": "plugin_mode2",

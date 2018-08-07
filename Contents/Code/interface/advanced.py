@@ -240,44 +240,48 @@ def TriggerCacheMaintenance(randomize=None):
     )
 
 
-def apply_default_mods(reapply_current=False):
+def apply_default_mods(reapply_current=False, scandir_generic=False):
     storage = get_subtitle_storage()
     subs_applied = 0
-    for fn in storage.get_all_files():
-        data = storage.load(None, filename=fn)
-        if data:
-            video_id = data.video_id
-            item_type = get_item_kind_from_rating_key(video_id)
-            if not item_type:
-                continue
 
-            for part_id, part in data.parts.iteritems():
-                for lang, subs in part.iteritems():
-                    current_sub = subs.get("current")
-                    if not current_sub:
-                        continue
-                    sub = subs[current_sub]
+    try:
+        for fn in storage.get_all_files(scandir_generic=scandir_generic):
+            data = storage.load(None, filename=fn)
+            if data:
+                video_id = data.video_id
+                item_type = get_item_kind_from_rating_key(video_id)
+                if not item_type:
+                    continue
 
-                    if not sub.content:
-                        continue
-
-                    current_mods = sub.mods or []
-                    if not reapply_current:
-                        add_mods = list(set(config.default_mods).difference(set(current_mods)))
-                        if not add_mods:
+                for part_id, part in data.parts.iteritems():
+                    for lang, subs in part.iteritems():
+                        current_sub = subs.get("current")
+                        if not current_sub:
                             continue
-                    else:
-                        if not current_mods:
+                        sub = subs[current_sub]
+
+                        if not sub.content:
                             continue
-                        add_mods = []
 
-                    try:
-                        set_mods_for_part(video_id, part_id, Language.fromietf(lang), item_type, add_mods, mode="add")
-                    except:
-                        Log.Error("Couldn't set mods for %s:%s: %s", video_id, part_id, traceback.format_exc())
-                        continue
+                        current_mods = sub.mods or []
+                        if not reapply_current:
+                            add_mods = list(set(config.default_mods).difference(set(current_mods)))
+                            if not add_mods:
+                                continue
+                        else:
+                            if not current_mods:
+                                continue
+                            add_mods = []
 
-                    subs_applied += 1
+                        try:
+                            set_mods_for_part(video_id, part_id, Language.fromietf(lang), item_type, add_mods, mode="add")
+                        except:
+                            Log.Error("Couldn't set mods for %s:%s: %s", video_id, part_id, traceback.format_exc())
+                            continue
+
+                        subs_applied += 1
+    except OSError:
+        return apply_default_mods(reapply_current=reapply_current, scandir_generic=True)
     storage.destroy()
     Log.Debug("Applied mods to %i items" % subs_applied)
 

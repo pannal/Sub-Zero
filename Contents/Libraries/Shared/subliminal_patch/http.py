@@ -110,7 +110,10 @@ class SubZeroRequestsTransport(xmlrpclib.SafeTransport):
             resp.raise_for_status()
 
             self.verbose = verbose
-            return self.parse_response(resp.raw)
+            try:
+                return self.parse_response(resp.raw)
+            except:
+                logger.debug("Bad response data: %r", resp.raw)
 
     def _build_url(self, host, handler):
         """

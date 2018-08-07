@@ -8,7 +8,7 @@ import traceback
 
 import appdirs
 
-from scandir import scandir
+from scandir import scandir, scandir_generic as _scandir_generic
 
 try:
     from collections.abc import MutableMapping
@@ -232,10 +232,11 @@ class FileCache(MutableMapping):
         """Convert an absolute cache filename to a key name."""
         return os.path.split(absfilename)[1]
 
-    def _all_filenames(self):
+    def _all_filenames(self, scandir_generic=True):
         """Return a list of absolute cache filenames"""
+        _scandir = _scandir_generic if scandir_generic else scandir
         try:
-            for entry in scandir(self.cache_dir):
+            for entry in _scandir(self.cache_dir):
                 if entry.is_file(follow_symlinks=False):
                     yield os.path.join(self.cache_dir, entry.name)
         except (FileNotFoundError, OSError):

@@ -31,7 +31,7 @@ from subliminal.core import guessit, ProviderPool, io, is_windows_special_path, 
 from subliminal_patch.exceptions import TooManyRequests
 
 from subzero.language import Language
-from scandir import scandir
+from scandir import scandir, scandir_generic as _scandir_generic
 
 logger = logging.getLogger(__name__)
 
@@ -550,12 +550,13 @@ def scan_video(path, dont_use_actual_file=False, hints=None, providers=None, ski
     return video
 
 
-def _search_external_subtitles(path, forced_tag=False, languages=None, only_one=False):
+def _search_external_subtitles(path, forced_tag=False, languages=None, only_one=False, scandir_generic=False):
     dirpath, filename = os.path.split(path)
     dirpath = dirpath or '.'
     fileroot, fileext = os.path.splitext(filename)
     subtitles = {}
-    for entry in scandir(dirpath):
+    _scandir = _scandir_generic if scandir_generic else scandir
+    for entry in _scandir(dirpath):
         if not entry.is_file(follow_symlinks=False):
             continue
 
@@ -626,8 +627,12 @@ def search_external_subtitles(path, forced_tag=False, languages=None, only_one=F
         logger.debug("external subs: scanning path %s", abspath)
 
         if os.path.isdir(os.path.dirname(abspath)):
-            subtitles.update(_search_external_subtitles(abspath, forced_tag=forced_tag, languages=languages,
-                                                        only_one=only_one))
+            try:
+                subtitles.update(_search_external_subtitles(abspath, forced_tag=forced_tag, languages=languages,
+                                                            only_one=only_one))
+            except OSError:
+                subtitles.update(_search_external_subtitles(abspath, forced_tag=forced_tag, languages=languages,
+                                                            only_one=only_one, scandir_generic=True))
     logger.debug("external subs: found %s", subtitles)
     return subtitles
 

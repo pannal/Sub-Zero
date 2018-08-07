@@ -1,9 +1,10 @@
 # coding=utf-8
 
 from subzero.lib.dict import DictProxy
+from config import config
 
 
-class IgnoreDict(DictProxy):
+class ExcludeDict(DictProxy):
     store = "ignore"
 
     # single item keys returned by helpers.items.getItems mapped to their parents
@@ -62,4 +63,13 @@ class IgnoreDict(DictProxy):
         return {"sections": [], "series": [], "videos": [], "titles": {}, "seasons": []}
 
 
-ignore_list = IgnoreDict(Dict)
+class IncludeDict(ExcludeDict):
+    store = "include"
+
+
+exclude_list = ExcludeDict(Dict)
+include_list = IncludeDict(Dict)
+
+
+def get_decision_list():
+    return include_list if config.include else exclude_list

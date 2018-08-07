@@ -18,6 +18,9 @@ class CommonFixes(SubtitleTextModification):
     long_description = "Fix common and whitespace/punctuation issues in subtitles"
 
     processors = [
+        # normalize hyphens
+        NReProcessor(re.compile(ur'(?u)([‑‐﹘﹣])'), u"-", name="CM_hyphens"),
+
         # -- = em dash
         NReProcessor(re.compile(r'(?u)(\w|\b|\s|^)(-\s?-{1,2})'), ur"\1—", name="CM_multidash"),
 
@@ -31,7 +34,18 @@ class CommonFixes(SubtitleTextModification):
         NReProcessor(re.compile(ur'(?u)(^[*#¶\s]*[*#¶]+[*#¶\s]*$)'), u"♪", name="CM_music_symbols"),
 
         # '' = "
-        StringProcessor("''", '"', name="CM_double_apostrophe"),
+        NReProcessor(re.compile(ur'(?u)([\'’ʼ❜‘‛][\'’ʼ❜‘‛]+)'), u'"', name="CM_double_apostrophe"),
+
+        # double quotes instead of single quotes inside words
+        NReProcessor(re.compile(ur'(?u)([A-zÀ-ž])"([A-zÀ-ž])'), ur"\1'\2", name="CM_double_as_single"),
+
+        # normalize quotes
+        NReProcessor(re.compile(ur'(?u)(\s*["”“‟„])\s*(["”“‟„]["”“‟„\s]*)'),
+                     lambda match: '"' + (" " if match.group(2).endswith(" ") else ""),
+                     name="CM_normalize_quotes"),
+
+        # normalize single quotes
+        NReProcessor(re.compile(ur'(?u)([\'’ʼ❜‘‛])'), u"'", name="CM_normalize_squotes"),
 
         # remove leading ...
         NReProcessor(re.compile(r'(?u)^\.\.\.[\s]*'), "", name="CM_leading_ellipsis"),

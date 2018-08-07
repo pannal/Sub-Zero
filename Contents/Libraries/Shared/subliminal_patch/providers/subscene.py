@@ -127,6 +127,9 @@ class SubsceneProvider(Provider, ProviderSubtitleArchiveMixin):
 
     def _create_filters(self, languages):
         self.filters = dict(HearingImpaired="2")
+        if self.only_foreign:
+            self.filters["ForeignOnly"] = "True"
+            logger.info("Only searching for foreign/forced subtitles")
 
         self.filters["LanguageFilter"] = ",".join((str(language_ids[l.alpha3]) for l in languages
                                                    if l.alpha3 in language_ids))
