@@ -1,0 +1,83 @@
+/*
+Copy this to "Library/Application Support/Plex Media Server/Plug-in Support/Data/com.plexapp.agents.subzero"
+and remove the ".template" suffix. Restart the plugin or the PMS.
+
+Don't expect support if you mess this up.
+*/
+{
+    // core config
+
+    // true: in case of a configured subtitle sub-folder, also clean up the folder containing the media item
+    "thorough_cleaning": false,
+
+    // list of subtitle formats that should be considered as text-based. useful if your media player doesn't natively
+    // support ASS/SSA for example (remove them from this list then)
+    "text_subtitle_formats": ["srt", "ass", "ssa", "vtt", "mov_text"],
+
+    // allow multiple automatic subtitle extractions at the same time; by default, to not clog up the CPU, SZ only
+    // executes one automatic extraction at a time. This does not affect manually started extractions and only affect
+    // multiple agent/metadata update calls. Refreshing a season or a full TV show will still only use one thread.
+    "auto_extract_multithread": false,
+
+    // when the find better subtitles task finds a subtitle for an item that has an active extracted embedded subtitle
+    // set, what should be the minimum score that subtitle has to have in order to be considered better?
+    "find_better_as_extracted_tv_score": 352,
+    "find_better_as_extracted_movie_score": 82,
+
+    "debug_i18n": false,
+
+    // per-provider-config
+    "providers": {
+        // enabled_for: specifies which media type to enable the provider for. does not override global/throttled
+        // languages: list of IETF language identifiers which overrides the global setting; e.g.: ["pt-BR", "es"]
+        "addic7ed": {
+            "enabled_for": ["series"],
+            "languages": [],
+        },
+        "legendastv": {
+            "enabled_for": ["series", "movies"],
+        },
+        "napiprojekt": {
+            "enabled_for": ["series", "movies"],
+        },
+        "opensubtitles": {
+            "enabled_for": ["series", "movies"],
+            "use_https": true,
+            "timeout": 15,
+        },
+        "podnapisi": {
+            "enabled_for": ["series", "movies"],
+        },
+        "shooter": {
+            "enabled_for": ["series", "movies"],
+        },
+        "subscene": {
+            "enabled_for": ["series", "movies"],
+        },
+        "subscenter": {
+            "enabled_for": ["series", "movies"],
+        },
+        "titlovi": {
+            "enabled_for": ["series", "movies"],
+        },
+        "tvsubtitles": {
+            "enabled_for": ["series"],
+        },
+        "hosszupuska": {
+            "enabled_for": ["series"],
+        },
+        "argenteam": {
+            "enabled_for": ["series", "movies"],
+        }
+    },
+
+    "refiners": {
+        "sonarr": {
+            // don't verify HTTPS certificates? Set to True for self-signed certificates
+            "ssl_no_verify": false,
+        },
+        "radarr": {
+            "ssl_no_verify": false,
+        },
+    }
+}

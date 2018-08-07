@@ -170,6 +170,9 @@ else:  # pragma: no cover
     unicode = str
     _byte_code = int   # noqa
 
+# don't break 2.6 completely
+if sys.hexversion < 0x2070000:
+    memoryview = lambda x: x  # noqa
 
 __version__ = '3.0'
 
@@ -214,6 +217,12 @@ ALT_OPEN_ARGS = ('-x', '--to-stdout', '-f')
 ALT_EXTRACT_ARGS = ('-x', '-f')
 ALT_TEST_ARGS = ('-t', '-f')
 ALT_CHECK_ARGS = ('--help',)
+
+#ALT_TOOL = 'unar'
+#ALT_OPEN_ARGS = ('-o', '-')
+#ALT_EXTRACT_ARGS = ()
+#ALT_TEST_ARGS = ('-test',) # does not work
+#ALT_CHECK_ARGS = ('-v',)
 
 #: whether to speed up decompression by using tmp archive
 USE_EXTRACT_HACK = 1
@@ -2525,6 +2534,53 @@ class Blake2SP(object):
         """Hexadecimal digest."""
         return tohex(self.digest())
 
+
+class Rar3Sha1(object):
+    """Bug-compat for SHA1
+    """
+    digest_size = 20
+    block_size = 64
+
+    _BLK_BE = struct.Struct(b'>16L')
+    _BLK_LE = struct.Struct(b'<16L')
+
+    __slots__ = ('_nbytes', '_md', '_rarbug')
+
+    def __init__(self, data=b'', rarbug=False):
+        self._md = sha1()
+        self._nbytes = 0
+        self._rarbug = rarbug
+        self.update(data)
+
+    def update(self, data):
+        """Process more data."""
+        self._md.update(data)
+        bufpos = self._nbytes & 63
+        self._nbytes += len(data)
+
+        if self._rarbug and len(data) > 64:
+            dpos = self.block_size - bufpos
+            while dpos + self.block_size <= len(data):
+                self._corrupt(data, dpos)
+                dpos += self.block_size
+
+    def digest(self):
+        """Return final state."""
+        return self._md.digest()
+
+    def hexdigest(self):
+        """Return final state as hex string."""
+        return self._md.hexdigest()
+
+    def _corrupt(self, data, dpos):
+        """Corruption from SHA1 core."""
+        ws = list(self._BLK_BE.unpack_from(data, dpos))
+        for t in range(16, 80):
+            tmp = ws[(t - 3) & 15] ^ ws[(t - 8) & 15] ^ ws[(t - 14) & 15] ^ ws[(t - 16) & 15]
+            ws[t & 15] = ((tmp << 1) | (tmp >> (32 - 1))) & 0xFFFFFFFF
+        self._BLK_LE.pack_into(data, dpos, *ws)
+
+
 ##
 ## Utility functions
 ##
@@ -2686,13 +2742,14 @@ def rar3_s2k(psw, salt):
     """
     if not isinstance(psw, unicode):
         psw = psw.decode('utf8')
-    seed = psw.encode('utf-16le') + salt
+    seed = bytearray(psw.encode('utf-16le') + salt)
+    h = Rar3Sha1(rarbug=True)
     iv = EMPTY
-    h = sha1()
     for i in range(16):
         for j in range(0x4000):
             cnt = S_LONG.pack(i * 0x4000 + j)
-            h.update(seed + cnt[:3])
+            h.update(seed)
+            h.update(cnt[:3])
             if j == 0:
                 iv += h.digest()[19:20]
     key_be = h.digest()[:16]
@@ -2814,6 +2871,8 @@ def custom_popen(cmd):
     except OSError as ex:
         if ex.errno == errno.ENOENT:
             raise RarCannotExec("Unrar not installed? (rarfile.UNRAR_TOOL=%r)" % UNRAR_TOOL)
+        if ex.errno == errno.EACCES or ex.errno == errno.EPERM:
+            raise RarCannotExec("Cannot execute unrar (rarfile.UNRAR_TOOL=%r)" % UNRAR_TOOL)
         raise
     return p
 
@@ -2945,7 +3004,12 @@ def _check_unrar_tool():
             TEST_ARGS = ALT_TEST_ARGS
         except RarCannotExec:
             # no usable tool, only uncompressed archives work
-            pass
+            return False
+    return True
 
-_check_unrar_tool()
+
+try:
+    _check_unrar_tool()
+except:
+    pass
 

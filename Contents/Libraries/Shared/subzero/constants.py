@@ -2,7 +2,7 @@
 
 OS_PLEX_USERAGENT = 'plexapp.com v9.0'
 
-DEPENDENCY_MODULE_NAMES = ['subliminal', 'subliminal_patch', 'enzyme', 'guessit', 'subzero', 'plex_activity']
+DEPENDENCY_MODULE_NAMES = ['subliminal', 'subliminal_patch', 'enzyme', 'guessit', 'subzero', 'libfilebot']
 PERSONAL_MEDIA_IDENTIFIER = "com.plexapp.agents.none"
 PLUGIN_IDENTIFIER_SHORT = "subzero"
 PLUGIN_IDENTIFIER = "com.plexapp.agents.%s" % PLUGIN_IDENTIFIER_SHORT
@@ -14,7 +14,7 @@ ART      = 'art-default.jpg'
 ICON     = 'icon-default.jpg'
 ICON_SUB = 'icon-sub.jpg'
 
-DEFAULT_TIMEOUT = 10
+DEFAULT_TIMEOUT = 15
 
 
 # media types as on https://github.com/Arcanemagus/plex-api/wiki/MediaTypes

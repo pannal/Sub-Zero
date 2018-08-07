@@ -1,5 +1,7 @@
 """Helper classes for tests."""
 
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
 __license__ = "MIT"
 
 import pickle
@@ -67,6 +69,18 @@ class HTMLTreeBuilderSmokeTest(object):
     markup in these tests, there's not much room for interpretation.
     """
 
+    def test_empty_element_tags(self):
+        """Verify that all HTML4 and HTML5 empty element (aka void element) tags
+        are handled correctly.
+        """
+        for name in [
+                'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr',
+                'spacer', 'frame'
+        ]:
+            soup = self.soup("")
+            new_tag = soup.new_tag(name)
+            self.assertEqual(True, new_tag.is_empty_element)
+    
     def test_pickle_and_unpickle_identity(self):
         # Pickling a tree, then unpickling it, yields a tree identical
         # to the original.
@@ -137,6 +151,14 @@ class HTMLTreeBuilderSmokeTest(object):
             markup.replace(b"\n", b""))
 
     def test_processing_instruction(self):
+        # We test both Unicode and bytestring to verify that
+        # process_markup correctly sets processing_instruction_class
+        # even when the markup is already Unicode and there is no
+        # need to process anything.
+        markup = u"""<?PITarget PIContent?>"""
+        soup = self.soup(markup)
+        self.assertEqual(markup, soup.decode())
+
         markup = b"""<?PITarget PIContent?>"""
         soup = self.soup(markup)
         self.assertEqual(markup, soup.encode("utf8"))
@@ -215,9 +237,22 @@ Hello, world!
         self.assertEqual(comment, baz.previous_element)
 
     def test_preserved_whitespace_in_pre_and_textarea(self):
-        """Whitespace must be preserved in <pre> and <textarea> tags."""
-        self.assertSoupEquals("<pre>   </pre>")
-        self.assertSoupEquals("<textarea> woo  </textarea>")
+        """Whitespace must be preserved in <pre> and <textarea> tags,
+        even if that would mean not prettifying the markup.
+        """
+        pre_markup = "<pre>   </pre>"
+        textarea_markup = "<textarea> woo\nwoo  </textarea>"
+        self.assertSoupEquals(pre_markup)
+        self.assertSoupEquals(textarea_markup)
+
+        soup = self.soup(pre_markup)
+        self.assertEqual(soup.pre.prettify(), pre_markup)
+
+        soup = self.soup(textarea_markup)
+        self.assertEqual(soup.textarea.prettify(), textarea_markup)
+
+        soup = self.soup("<textarea></textarea>")
+        self.assertEqual(soup.textarea.prettify(), "<textarea></textarea>")
 
     def test_nested_inline_elements(self):
         """Inline elements can be nested indefinitely."""
@@ -307,6 +342,13 @@ Hello, world!
         self.assertEqual("p", soup.p.name)
         self.assertConnectedness(soup)
 
+    def test_empty_element_tags(self):
+        """Verify consistent handling of empty-element tags,
+        no matter how they come in through the markup.
+        """
+        self.assertSoupEquals('<br/><br/><br/>', "<br/><br/><br/>")
+        self.assertSoupEquals('<br /><br /><br />', "<br/><br/><br/>")
+        
     def test_head_tag_between_head_and_body(self):
         "Prevent recurrence of a bug in the html5lib treebuilder."
         content = """<html><head></head>
@@ -480,7 +522,9 @@ Hello, world!
         hebrew_document = b'<html><head><title>Hebrew (ISO 8859-8) in Visual Directionality</title></head><body><h1>Hebrew (ISO 8859-8) in Visual Directionality</h1>\xed\xe5\xec\xf9</body></html>'
         soup = self.soup(
             hebrew_document, from_encoding="iso8859-8")
-        self.assertEqual(soup.original_encoding, 'iso8859-8')
+        # Some tree builders call it iso8859-8, others call it iso-8859-9.
+        # That's not a difference we really care about.
+        assert soup.original_encoding in ('iso8859-8', 'iso-8859-8')
         self.assertEqual(
             soup.encode('utf-8'),
             hebrew_document.decode("iso8859-8").encode("utf-8"))
@@ -563,6 +607,11 @@ class XMLTreeBuilderSmokeTest(object):
         soup = self.soup(markup)
         self.assertEqual(markup, soup.encode("utf8"))
 
+    def test_processing_instruction(self):
+        markup = b"""<?xml version="1.0" encoding="utf8"?>\n<?PITarget PIContent?>"""
+        soup = self.soup(markup)
+        self.assertEqual(markup, soup.encode("utf8"))
+
     def test_real_xhtml_document(self):
         """A real XHTML document should come out *exactly* the same as it went in."""
         markup = b"""<?xml version="1.0" encoding="utf-8"?>
@@ -638,6 +687,40 @@ class XMLTreeBuilderSmokeTest(object):
         markup = '<foo xml:lang="fr">bar</foo>'
         soup = self.soup(markup)
         self.assertEqual(unicode(soup.foo), markup)
+
+    def test_find_by_prefixed_name(self):
+        doc = """<?xml version="1.0" encoding="utf-8"?>
+<Document xmlns="http://example.com/ns0"
+    xmlns:ns1="http://example.com/ns1"
+    xmlns:ns2="http://example.com/ns2"
+    <ns1:tag>foo</ns1:tag>
+    <ns1:tag>bar</ns1:tag>
+    <ns2:tag key="value">baz</ns2:tag>
+</Document>
+"""
+        soup = self.soup(doc)
+
+        # There are three <tag> tags.
+        self.assertEqual(3, len(soup.find_all('tag')))
+
+        # But two of them are ns1:tag and one of them is ns2:tag.
+        self.assertEqual(2, len(soup.find_all('ns1:tag')))
+        self.assertEqual(1, len(soup.find_all('ns2:tag')))
+        
+        self.assertEqual(1, len(soup.find_all('ns2:tag', key='value')))
+        self.assertEqual(3, len(soup.find_all(['ns1:tag', 'ns2:tag'])))
+        
+    def test_copy_tag_preserves_namespace(self):
+        xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://example.com/ns0"/>"""
+    
+        soup = self.soup(xml)
+        tag = soup.document
+        duplicate = copy.copy(tag)
+
+        # The two tags have the same namespace prefix.
+        self.assertEqual(tag.prefix, duplicate.prefix)
+
 
 class HTML5TreeBuilderSmokeTest(HTMLTreeBuilderSmokeTest):
     """Smoke test for a tree builder that supports HTML5."""

@@ -1,6 +1,6 @@
 [
   {
-    "id": "langPref1",
+    "id": "langPref1a",
     "label": "Subtitle Language (1)",
     "type": "enum",
     "values": [
@@ -50,12 +50,14 @@
       "tr",
       "uk",
       "vi",
-      "hr"
+      "hr",
+      "zh-hans",
+      "zh-hant"
     ],
     "default": "en"
   },
   {
-    "id": "langPref2",
+    "id": "langPref2a",
     "label": "Subtitle Language (2)",
     "type": "enum",
     "values": [
@@ -106,12 +108,14 @@
       "tr",
       "uk",
       "vi",
-      "hr"
+      "hr",
+      "zh-hans",
+      "zh-hant"
     ],
     "default": "None"
   },
   {
-    "id": "langPref3",
+    "id": "langPref3a",
     "label": "Subtitle Language (3)",
     "type": "enum",
     "values": [
@@ -162,7 +166,9 @@
       "tr",
       "uk",
       "vi",
-      "hr"
+      "hr",
+      "zh-hans",
+      "zh-hant"
     ],
     "default": "None"
   },
@@ -179,10 +185,16 @@
     "default": "false"
   },
   {
-    "id": "subtitles.language.ietf",
-    "label": "Treat IETF language tags as ISO 639-1 (e.g. pt-BR = pt)",
+    "id": "subtitles.language.ietf_display",
+    "label": "Display languages with country attribute as ISO 639-1 (e.g. pt-BR = pt)",
     "type": "bool",
     "default": "true"
+  },
+  {
+    "id": "subtitles.language.ietf_normalize",
+    "label": "Treat languages with country attribute as ISO 639-1 (e.g. don't download pt-BR if pt subtitle exists)",
+    "type": "bool",
+    "default": "false"
   },
   {
     "id": "subtitles.only_one",
@@ -197,6 +209,50 @@
     "default": "true"
   },
   {
+    "id": "media_rename1",
+    "label": "I rename my files using",
+    "type": "enum",
+    "values": [
+      "Sonarr/Radarr (fill api info below)",
+      "Filebot",
+      "Sonarr/Radarr/Filebot",
+      "Symlink to original file",
+      "I keep the original filenames",
+      "none of the above"
+    ],
+    "default": "I keep the original filenames"
+  },
+  {
+    "id": "use_file_info_file",
+    "label": "Retrieve original filename from .file_info/file_info index files (see wiki)",
+    "type": "bool",
+    "default": "false"
+  },
+  {
+    "id": "drone_api.sonarr.url",
+    "label": "Sonarr URL (add URL base if configured)",
+    "type": "text",
+    "default": "http://127.0.0.1:8989"
+  },
+  {
+    "id": "drone_api.sonarr.api_key",
+    "label": "Sonarr API key",
+    "type": "text",
+    "default": ""
+  },
+  {
+    "id": "drone_api.radarr.url",
+    "label": "Radarr URL (add URL base if configured, min. version: 0.2.0.897)",
+    "type": "text",
+    "default": "http://127.0.0.1:7878"
+  },
+  {
+    "id": "drone_api.radarr.api_key",
+    "label": "Radarr API key",
+    "type": "text",
+    "default": ""
+  },
+  {
     "id": "provider.opensubtitles.enabled",
     "label": "Provider: Enable OpenSubtitles",
     "type": "bool",
@@ -204,7 +260,7 @@
   },
   {
     "id": "provider.opensubtitles.username",
-    "label": "Opensubtitles Username (VIP)",
+    "label": "Opensubtitles Username",
     "type": "text",
     "default": ""
   },
@@ -217,8 +273,20 @@
     "secure": "true"
   },
   {
+    "id": "provider.opensubtitles.is_vip",
+    "label": "OpenSubtitles VIP? (ad-free subs, 1000 subs/day, no-cache VIP server: http://v.ht/osvip)",
+    "type": "bool",
+    "default": "false"
+  },
+  {
     "id": "provider.podnapisi.enabled",
     "label": "Provider: Enable Podnapisi.NET",
+    "type": "bool",
+    "default": "true"
+  },
+  {
+    "id": "provider.titlovi.enabled",
+    "label": "Provider: Enable Titlovi.com",
     "type": "bool",
     "default": "true"
   },
@@ -243,7 +311,7 @@
     "secure": "true"
   },
   {
-    "id": "provider.addic7ed.boost_by1",
+    "id": "provider.addic7ed.boost_by2",
     "label": "Addic7ed: boost score (if requirements met)",
     "type": "enum",
     "values": [
@@ -266,18 +334,19 @@
       "25",
       "21",
       "20",
+      "19",
       "15",
       "10",
       "5",
       "0"
     ],
-    "default": "21"
+    "default": "19"
   },
   {
-    "id": "provider.addic7ed.use_random_agents",
+    "id": "provider.addic7ed.use_random_agents1",
     "label": "Addic7ed: Use random user agents",
     "type": "bool",
-    "default": "false"
+    "default": "true"
   },
   {
     "id": "provider.legendastv.enabled",
@@ -312,30 +381,40 @@
     "default": "false"
   },
   {
-    "id": "provider.shooter.enabled",
-    "label": "Provider: Enable Shooter.cn (Chinese)",
+    "id": "provider.subscene.enabled",
+    "label": "Provider: Enable SubScene (TV shows)",
+    "type": "bool",
+    "default": "true"
+  },
+  {
+    "id": "provider.supersubtitles.enabled",
+    "label": "Provider: Enable feliratok.info (Hungarian)",
     "type": "bool",
     "default": "false"
   },
   {
-    "id": "provider.subscenter.enabled",
-    "label": "Provider: Enable SubsCenter (Hebrew)",
+    "id": "provider.hosszupuska.enabled",
+    "label": "Provider: Enable hosszupuskasub.com (Hungarian)",
     "type": "bool",
     "default": "false"
   },
   {
-    "id": "provider.subscenter.username",
-    "label": "SubsCenter Username",
+    "id": "provider.argenteam.enabled",
+    "label": "Provider: Enable aRGENTeaM (Spanish)",
+    "type": "bool",
+    "default": "false"
+  },
+  {
+    "id": "provider.assrt.enabled",
+    "label": "Provider: Enable assrt.net (Chinese)",
+    "type": "bool",
+    "default": "false"
+  },
+  {
+    "id": "provider.assrt.token",
+    "label": "Assrt API Token",
     "type": "text",
     "default": ""
-  },
-  {
-    "id": "provider.subscenter.password",
-    "label": "SubsCenter Password",
-    "type": "text",
-    "option": "hidden",
-    "default": "",
-    "secure": "true"
   },
   {
     "id": "providers.multithreading",
@@ -344,32 +423,32 @@
     "default": "true"
   },
   {
-    "id": "provider.opensubtitles.use_tags",
-    "label": "I keep the exact (release-) filename of my media files",
+    "id": "subtitles.embedded.autoextract",
+    "label": "Automatically extract and use embedded subtitles upon media addition (with configured default mods)",
     "type": "bool",
-    "default": "true"
+    "default": "false"
+  },
+  {
+    "id": "subtitles.search_after_autoextract",
+    "label": "After automatic extraction of embedded subtitles, also immediately search for available subtitles?",
+    "type": "bool",
+    "default": "false"
   },
   {
     "id": "subtitles.scan.embedded",
-    "label": "Scan: include embedded subtitles (in the media file (MKV/MP4), don't download if existing)",
+    "label": "Don't search for subtitles of a language if there are embedded subtitles inside the media file (MKV/MP4)?",
     "type": "bool",
     "default": "false"
   },
   {
     "id": "subtitles.scan.external",
-    "label": "Scan: include external subtitles (metadata/filesystem, don't download if existing)",
+    "label": "Don't search for subtitles of a language if they already exist on the filesystem (metadata/filesystem)?",
     "type": "bool",
     "default": "true"
   },
   {
-    "id": "subtitles.scan.exotic_ext",
-    "label": "Scan: include \"exotic\" subtitle formats (anything else than .srt/.ssa/.ass/.vtt; embedded or external)",
-    "type": "bool",
-    "default": "false"
-  },
-  {
     "id": "subtitles.scan.filename_strictness",
-    "label": "Scan: which external subtitles should be picked up?",
+    "label": "How strict should these subtitles existing on the filesystem be detected?",
     "type": "enum",
     "values": [
       "exact: media filename match",
@@ -377,6 +456,12 @@
       "any"
     ],
     "default": "loose: filename contains media filename"
+  },
+  {
+    "id": "subtitles.scan.exotic_ext",
+    "label": "Include non-text subtitle formats (anything else than .srt/.ssa/.ass/.vtt; embedded or external) in the above?",
+    "type": "bool",
+    "default": "false"
   },
   {
     "id": "subtitles.search.minimumTVScore2",
@@ -409,8 +494,14 @@
     "default": "false"
   },
   {
+    "id": "subtitles.remove_tags",
+    "label": "Remove style tags from downloaded subtitles (bold, italic, underline, colors, ...)",
+    "type": "bool",
+    "default": "false"
+  },
+  {
     "id": "subtitles.fix_common",
-    "label": "Fix common whitespace/punctuation issues in subtitles",
+    "label": "Fix common issues in subtitles",
     "type": "bool",
     "default": "true"
   },
@@ -419,6 +510,12 @@
     "label": "Fix common OCR errors in downloaded subtitles",
     "type": "bool",
     "default": "true"
+  },
+  {
+    "id": "subtitles.reverse_rtl",
+    "label": "Reverse punctuation in RTL languages (heb)",
+    "type": "bool",
+    "default": "false"
   },
   {
     "id": "subtitles.colors",
@@ -518,8 +615,6 @@
     "type": "enum",
     "values": [
       "never",
-      "every 1 hours",
-      "every 3 hours",
       "every 6 hours",
       "every 12 hours",
       "every 24 hours"
@@ -540,7 +635,8 @@
       "3 weeks",
       "4 weeks",
       "5 weeks",
-      "6 weeks"
+      "6 weeks",
+      "12 weeks"
     ],
     "default": "2 weeks"
   },
@@ -569,10 +665,29 @@
     "default": "7"
   },
   {
+    "id": "scheduler.tasks.FindBetterSubtitles.air_date_cutoff",
+    "label": "Scheduler: Don't search for better subtitles if the item's air date is older than",
+    "type": "enum",
+    "values": [
+      "don't limit",
+      "1 year",
+      "2 years",
+      "3 years",
+      "4 years",
+      "5 years",
+      "6 years",
+      "7 years",
+      "8 years",
+      "9 years",
+      "10 years"
+    ],
+    "default": "1 year"
+  },
+  {
     "id": "scheduler.tasks.FindBetterSubtitles.overwrite_manually_selected",
     "label": "Scheduler: Overwrite manually selected subtitles when better found",
     "type": "bool",
-    "default": "false"
+    "default": "true"
   },
   {
     "id": "scheduler.tasks.FindBetterSubtitles.overwrite_manually_modified",
@@ -618,15 +733,15 @@
     "default": ""
   },
   {
-    "id": "plugin_mode",
+    "id": "plugin_mode2",
     "label": "Sub-Zero mode",
     "type": "enum",
     "values": [
-      "agent + channel",
+      "agent + interface",
       "only agent",
-      "only channel"
+      "only interface"
     ],
-    "default": "agent + channel"
+    "default": "agent + interface"
   },
   {
     "id": "plugin_pin",
@@ -643,12 +758,12 @@
     "default": "10"
   },
   {
-    "id": "plugin_pin_mode",
+    "id": "plugin_pin_mode2",
     "label": "Use PIN to restrict access to (needs plugin or PMS restart)",
     "type": "enum",
     "values": [
       "disabled",
-      "channel menu",
+      "interface",
       "advanced menu"
     ],
     "default": "disabled"
@@ -666,6 +781,36 @@
     "default": "true"
   },
   {
+    "id": "new_style_cache",
+    "label": "Use new style caching (for subliminal)",
+    "type": "bool",
+    "default": "true"
+  },
+  {
+    "id": "low_impact_mode",
+    "label": "Low impact mode (for remote filesystems)",
+    "type": "bool",
+    "default": "false"
+  },
+  {
+    "id": "pms_request_timeout",
+    "label": "Timeout for API requests sent to the PMS",
+    "type": "text",
+    "default": "15"
+  },
+  {
+    "id": "proxy",
+    "label": "HTTP proxy to use for providers (supports credentials)",
+    "type": "text",
+    "default": ""
+  },
+  {
+    "id": "path_to_advanced_settings",
+    "label": "Custom path to advanced_settings.json",
+    "type": "text",
+    "default": ""
+  },
+  {
     "id": "log_level",
     "label": "How verbose should the logging be?",
     "type": "enum",
@@ -677,6 +822,12 @@
       "DEBUG"
     ],
     "default": "WARNING"
+  },
+  {
+    "id": "log_rotate_keep",
+    "label": "How many log backups to keep?",
+    "type": "text",
+    "default": "5"
   },
   {
     "id": "log_debug_mods",

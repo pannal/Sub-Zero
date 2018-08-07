@@ -3,9 +3,10 @@
 import subliminal
 
 # patch subliminal's subtitle and provider base
-from .subtitle import PatchedSubtitle
+from .subtitle import Subtitle, guess_matches
 from .providers import Provider
-subliminal.subtitle.Subtitle = PatchedSubtitle
+subliminal.subtitle.Subtitle = Subtitle
+subliminal.subtitle.guess_matches = guess_matches
 
 from .core import scan_video, search_external_subtitles, list_all_subtitles, save_subtitles, refine, \
     download_best_subtitles

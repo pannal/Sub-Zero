@@ -2,7 +2,6 @@
 
 from subliminal.providers.subscenter import SubsCenterProvider as _SubsCenterProvider, \
     SubsCenterSubtitle as _SubsCenterSubtitle
-from subliminal_patch.extensions import provider_registry
 
 
 class SubsCenterSubtitle(_SubsCenterSubtitle):
@@ -24,4 +23,5 @@ class SubsCenterSubtitle(_SubsCenterSubtitle):
 class SubsCenterProvider(_SubsCenterProvider):
     subtitle_class = SubsCenterSubtitle
     hearing_impaired_verifiable = True
+    server_url = 'http://www.subscenter.info/he/'
 

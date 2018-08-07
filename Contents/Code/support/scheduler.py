@@ -4,21 +4,24 @@ import datetime
 import logging
 import traceback
 
+from config import config
 
 def parse_frequency(s):
-    if s == "never" or s == None:
+    if s == "never" or s is None:
         return None, None
     kind, num, unit = s.split()
     return int(num), unit
 
 
 class DefaultScheduler(object):
-    thread = None
+    queue_thread = None
+    scheduler_thread = None
     running = False
     registry = None
 
     def __init__(self):
-        self.thread = None
+        self.queue_thread = None
+        self.scheduler_thread = None
         self.running = False
         self.registry = []
 
@@ -47,6 +50,7 @@ class DefaultScheduler(object):
             if Dict["tasks"]:
                 for task_name in Dict["tasks"].keys():
                     if task_name == "queue":
+                        Dict["tasks"][task_name] = []
                         continue
 
                     Dict["tasks"][task_name]["data"] = {}
@@ -58,6 +62,7 @@ class DefaultScheduler(object):
             raise NotImplementedError("Task missing! %s" % name)
 
         Dict["tasks"][name]["data"] = {}
+        Dict["tasks"][name]["running"] = False
         Dict.Save()
         Log.Debug("Task data cleared: %s", name)
 
@@ -68,7 +73,7 @@ class DefaultScheduler(object):
         # discover tasks;
         self.tasks = {}
         for cls in self.registry:
-            task = cls(self)
+            task = cls()
             try:
                 task_frequency = Prefs["scheduler.tasks.%s.frequency" % task.name]
             except KeyError:
@@ -78,7 +83,8 @@ class DefaultScheduler(object):
 
     def run(self):
         self.running = True
-        self.thread = Thread.Create(self.worker)
+        self.scheduler_thread = Thread.Create(self.scheduler_worker)
+        self.queue_thread = Thread.Create(self.queue_worker)
 
     def stop(self):
         self.running = False
@@ -113,6 +119,7 @@ class DefaultScheduler(object):
 
     def run_task(self, name, *args, **kwargs):
         task = self.tasks[name]["task"]
+
         if task.running:
             Log.Debug("Scheduler: Not running %s, as it's currently running.", name)
             return False
@@ -124,8 +131,12 @@ class DefaultScheduler(object):
         except Exception, e:
             Log.Error("Scheduler: Something went wrong when running %s: %s", name, traceback.format_exc())
         finally:
-            task.post_run(Dict["tasks"][name]["data"])
+            try:
+                task.post_run(Dict["tasks"][name]["data"])
+            except:
+                Log.Error("Scheduler: task.post_run failed for %s: %s", name, traceback.format_exc())
             Dict.Save()
+            config.sync_cache()
 
     def dispatch_task(self, *args, **kwargs):
         if "queue" not in Dict["tasks"]:
@@ -134,8 +145,12 @@ class DefaultScheduler(object):
         Dict["tasks"]["queue"].append((args, kwargs))
 
     def signal(self, name, *args, **kwargs):
-        for task_name, info in self.tasks.iteritems():
-            task = info["task"]
+        for task_name in self.tasks.keys():
+            task = self.task(task_name)
+            if not task:
+                Log.Error("Scheduler: Task %s not found (?!)" % task_name)
+                continue
+
             if not task.periodic:
                 continue
 
@@ -153,7 +168,7 @@ class DefaultScheduler(object):
                 continue
             Log.Debug("Scheduler: Not sending signal %s to task %s, because: not running", name, task_name)
 
-    def worker(self):
+    def queue_worker(self):
         Thread.Sleep(10.0)
         while 1:
             if not self.running:
@@ -166,13 +181,25 @@ class DefaultScheduler(object):
                 Dict["tasks"]["queue"] = []
                 Dict.Save()
                 for args, kwargs in queue:
-                    Log.Debug("Dispatching single task: %s, %s", args, kwargs)
+                    Log.Debug("Queue: Dispatching single task: %s, %s", args, kwargs)
                     Thread.Create(self.run_task, True, *args, **kwargs)
                     Thread.Sleep(5.0)
 
+            Thread.Sleep(1)
+
+    def scheduler_worker(self):
+        Thread.Sleep(10.0)
+        while 1:
+            if not self.running:
+                break
+
             # scheduled tasks
-            for name, info in self.tasks.iteritems():
+            for name in self.tasks.keys():
                 now = datetime.datetime.now()
+                info = self.tasks.get(name)
+                if not info:
+                    Log.Error("Scheduler: Task %s not found (?!)" % name)
+                    continue
                 task = info["task"]
 
                 if name not in Dict["tasks"] or not task.periodic:
@@ -184,6 +211,14 @@ class DefaultScheduler(object):
                 frequency_num, frequency_key = info["frequency"]
                 if not frequency_num:
                     continue
+
+                # run legacy SARAM once
+                if name == "SearchAllRecentlyAddedMissing" and ("hasRunLSARAM" not in Dict or not Dict["hasRunLSARAM"]):
+                    task = self.tasks["LegacySearchAllRecentlyAddedMissing"]["task"]
+                    task.last_run = None
+                    name = "LegacySearchAllRecentlyAddedMissing"
+                    Dict["hasRunLSARAM"] = True
+                    Dict.Save()
 
                 if not task.last_run or (task.last_run + datetime.timedelta(**{frequency_key: frequency_num}) <= now):
                     # fixme: scheduled tasks run synchronously. is this the best idea?

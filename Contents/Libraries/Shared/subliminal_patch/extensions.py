@@ -49,9 +49,18 @@ class ProviderRegistry(object):
 provider_registry = ProviderRegistry()
 
 # add language converters
-babelfish.language_converters.unregister('addic7ed = subliminal.converters.addic7ed:Addic7edConverter')
+try:
+    babelfish.language_converters.unregister('addic7ed = subliminal.converters.addic7ed:Addic7edConverter')
+except ValueError:
+    pass
+
 babelfish.language_converters.register('addic7ed = subliminal_patch.language:PatchedAddic7edConverter')
 babelfish.language_converters.register('szopensubtitles = subliminal_patch.language:PatchedOpenSubtitlesConverter')
 subliminal.refiner_manager.register('sz_metadata = subliminal_patch.refiners.metadata:refine')
 subliminal.refiner_manager.register('sz_omdb = subliminal_patch.refiners.omdb:refine')
+subliminal.refiner_manager.register('sz_tvdb = subliminal_patch.refiners.tvdb:refine')
+subliminal.refiner_manager.register('drone = subliminal_patch.refiners.drone:refine')
+subliminal.refiner_manager.register('filebot = subliminal_patch.refiners.filebot:refine')
+subliminal.refiner_manager.register('file_info_file = subliminal_patch.refiners.file_info_file:refine')
+subliminal.refiner_manager.register('symlinks = subliminal_patch.refiners.symlinks:refine')
 

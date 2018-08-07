@@ -34,7 +34,8 @@ import six
 from ._abnf import ABNF
 from ._core import WebSocket, getdefaulttimeout
 from ._exceptions import *
-from ._logging import *
+from . import _logging
+
 
 __all__ = ["WebSocketApp"]
 
@@ -133,7 +134,7 @@ class WebSocketApp(object):
                 try:
                     self.sock.ping()
                 except Exception as ex:
-                    warning("send_ping routine terminated: {}".format(ex))
+                    _logging.warning("send_ping routine terminated: {}".format(ex))
                     break
 
     def run_forever(self, sockopt=None, sslopt=None,
@@ -197,7 +198,7 @@ class WebSocketApp(object):
 
             while self.sock.connected:
                 r, w, e = select.select(
-                    (self.sock.sock, ), (), (), ping_timeout)
+                    (self.sock.sock, ), (), (), ping_timeout or 10) # Use a 10 second timeout to avoid to wait forever on close
                 if not self.keep_running:
                     break
 
@@ -218,7 +219,7 @@ class WebSocketApp(object):
                                        frame.data, frame.fin)
                     else:
                         data = frame.data
-                        if six.PY3 and opcode == ABNF.OPCODE_TEXT:
+                        if six.PY3 and op_code == ABNF.OPCODE_TEXT:
                             data = data.decode("utf-8")
                         self._callback(self.on_data, data, frame.opcode, True)
                         self._callback(self.on_message, data)
@@ -267,7 +268,7 @@ class WebSocketApp(object):
             try:
                 callback(self, *args)
             except Exception as e:
-                error("error from callback {}: {}".format(callback, e))
-                if isEnabledForDebug():
+                _logging.error("error from callback {}: {}".format(callback, e))
+                if _logging.isEnabledForDebug():
                     _, _, tb = sys.exc_info()
                     traceback.print_tb(tb)

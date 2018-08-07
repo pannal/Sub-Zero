@@ -3895,6 +3895,7 @@
   season: 7
   episode: 22
   episode_title: 2000 Light Years from Home
+  other: Classic
   container: mkv
   mimetype: video/x-matroska
   type: episode
@@ -3961,16 +3962,4 @@
   episode: 9
   subtitle_language: fr
   other: FullHD
-  type: episode
-
-? Whose Line is it anyway/Season 01/Whose.Line.is.it.Anyway.US.S13E01.720p.WEB.x264-TBS.mkv
-: title: Whose Line is it Anyway
-  season: 13
-  episode: 1
-  country: US
-  screen_size: 720p
-  format: WEB-DL
-  video_codec: h264
-  release_group: TBS
-  container: mkv
   type: episode

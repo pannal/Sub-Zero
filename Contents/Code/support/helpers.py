@@ -15,7 +15,7 @@ from collections import OrderedDict
 import chardet
 
 from bs4 import UnicodeDammit
-from babelfish import Language
+from subzero.language import Language
 from subzero.analytics import track_event
 
 mswindows = (sys.platform == "win32")
@@ -42,6 +42,13 @@ RE_UNICODE_CONTROL = u'([\u0000-\u0008\u000b-\u000c\u000e-\u001f\ufffe-\uffff])'
 
 def cast_bool(value):
     return str(value).strip() in ("true", "True")
+
+
+def cast_int(value, default=None):
+    try:
+        return int(value)
+    except ValueError:
+        return default
 
 
 # A platform independent way to split paths which might come in with different separators.
@@ -151,10 +158,11 @@ def get_video_display_title(kind, title, section_title=None, parent_title=None, 
     if add_section_title:
         section_add = ("%s: " % section_title) if section_title else ""
 
-    if kind == "show" and parent_title:
+    if kind in ("season", "show") and parent_title:
         if season and episode:
             return '%s%s S%02dE%02d%s' % (section_add, parent_title, season or 0, episode or 0,
                                           (", %s" % title if title else ""))
+
         return '%s%s%s' % (section_add, parent_title, (", %s" % title if title else ""))
     return "%s%s" % (section_add, title)
 
@@ -202,7 +210,7 @@ def decode_message(s):
 
 
 def timestamp():
-    return int(time.time())
+    return int(time.time()*1000)
 
 
 def df(d):
@@ -284,7 +292,6 @@ def notify_executable(exe_info, videos, subtitles, storage):
             prepared_arguments = [arg % prepared_data for arg in arguments]
 
             Log.Debug(u"Calling %s with arguments: %s" % (exe, prepared_arguments))
-            env = os.environ
             if not mswindows:
                 env_path = {"PATH": os.pathsep.join(
                                         [
@@ -295,14 +302,30 @@ def notify_executable(exe_info, videos, subtitles, storage):
                                     )
                             }
                 env = dict(os.environ, **env_path)
+                env.pop("LD_LIBRARY_PATH", None)
+            else:
+                env = dict(os.environ)
+
+            # clean out any Plex-PYTHONPATH that may bleed through the spawned process
+            if "PYTHONPATH" in env and "plex" in env["PYTHONPATH"].lower():
+                del env["PYTHONPATH"]
 
             try:
-                output = subprocess.check_output(quote_args([exe] + prepared_arguments),
-                                                 stderr=subprocess.STDOUT, shell=True, env=env)
-            except subprocess.CalledProcessError:
-                Log.Error(u"Calling %s failed: %s" % (exe, traceback.format_exc()))
+                proc = subprocess.Popen(quote_args([exe] + prepared_arguments), stdout=subprocess.PIPE,
+                                        stderr=subprocess.PIPE, shell=True, env=env, cwd=os.path.dirname(exe))
+                output, errors = proc.communicate()
+
+                if proc.returncode == 1:
+                    Log.Error(u"Calling %s with args %s failed: output:\n%s, error:\n%s", exe, prepared_arguments,
+                             output, errors)
+                    return
+
+                output = output.decode()
+
+            except:
+                Log.Error(u"Calling %s failed: %s", exe, traceback.format_exc())
             else:
-                Log.Debug(u"Process output: %s" % output)
+                Log.Debug(u"Process output: %s", output)
 
 
 def track_usage(category=None, action=None, label=None, value=None):
@@ -329,9 +352,12 @@ def track_usage(category=None, action=None, label=None, value=None):
             except:
                 pass
 
-    Thread.Create(dispatch_track_usage, category, action, label, value,
-                  identifier=Dict["anon_id"], first_use=Dict["first_use"],
-                  add=Network.PublicAddress)
+    try:
+        Thread.Create(dispatch_track_usage, category, action, label, value,
+                      identifier=Dict["anon_id"], first_use=Dict["first_use"],
+                      add=Network.PublicAddress)
+    except:
+        Log.Debug("Something went wrong when reporting anonymous user statistics: %s", traceback.format_exc())
 
 
 def dispatch_track_usage(*args, **kwargs):
@@ -344,8 +370,29 @@ def dispatch_track_usage(*args, **kwargs):
         Log.Debug("Something went wrong when reporting anonymous user statistics: %s", traceback.format_exc())
 
 
+def get_language_from_stream(lang_code):
+    if lang_code:
+        lang = Locale.Language.Match(lang_code)
+        if lang and lang != "xx":
+            # Log.Debug("Found language: %r", lang)
+            return Language.fromietf(lang)
+
+
 def get_language(lang_short):
     return Language.fromietf(lang_short)
+
+
+def display_language(l):
+    return _(str(l).lower())
+
+
+def is_stream_forced(stream):
+    stream_title = getattr(stream, "title", "") or ""
+    forced = getattr(stream, "forced", False)
+    if not forced and stream_title and "forced" in stream_title.strip().lower():
+        forced = True
+
+    return forced
 
 
 class PartUnknownException(Exception):

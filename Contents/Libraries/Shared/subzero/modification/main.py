@@ -16,6 +16,7 @@ class SubtitleModifications(object):
     debug = False
     language = None
     initialized_mods = {}
+    f = None
 
     font_style_tag_start = u"{\\"
 
@@ -48,6 +49,8 @@ class SubtitleModifications(object):
                 logger.exception("Couldn't load subtitle: %s: %s", fn, traceback.format_exc())
             elif content:
                 logger.exception("Couldn't load subtitle: %s", traceback.format_exc())
+
+        return bool(self.f)
 
     @classmethod
     def parse_identifier(cls, identifier):
@@ -85,6 +88,13 @@ class SubtitleModifications(object):
             if identifier in final_mods and mod_cls.exclusive:
                 final_mods.pop(identifier)
 
+            # language-specific mod, check validity
+            if mod_cls.languages and self.language not in mod_cls.languages:
+                if self.debug:
+                    logger.debug("Skipping %s, because %r is not a valid language for this mod",
+                                 identifier, self.language)
+                continue
+
             # merge args of duplicate mods if possible
             elif identifier in final_mods and mod_cls.args_mergeable:
                 final_mods[identifier] = mod_cls.merge_args(final_mods[identifier], args)
@@ -110,7 +120,7 @@ class SubtitleModifications(object):
         start = time.time()
         line_mods, non_line_mods = self.prepare_mods(*mods)
 
-        # apply file mods
+        # apply non-last file mods
         if non_line_mods:
             non_line_mods_start = time.time()
             self.apply_non_line_mods(non_line_mods)
@@ -129,17 +139,30 @@ class SubtitleModifications(object):
             if self.debug:
                 logger.debug("Line mods took %ss", time.time() - line_mods_start)
 
-        self.f.events = new_entries
+            if new_entries:
+                self.f.events = new_entries
+
+        # apply last file mods
+        if non_line_mods:
+            non_line_mods_start = time.time()
+            self.apply_non_line_mods(non_line_mods, only_last=True)
+
+            if self.debug:
+                logger.debug("Final Non-Line mods took %ss", time.time() - non_line_mods_start)
+
         if self.debug:
             logger.debug("Subtitle Modification took %ss", time.time() - start)
 
-    def apply_non_line_mods(self, mods):
+    def apply_non_line_mods(self, mods, only_last=False):
         for identifier, args in mods:
             mod = self.initialized_mods[identifier]
-            mod.modify(None, debug=self.debug, parent=self, **args)
+            if (not only_last and not mod.apply_last) or (only_last and mod.apply_last):
+                if self.debug:
+                    logger.debug("Applying %s", identifier)
+                mod.modify(None, debug=self.debug, parent=self, **args)
 
     def apply_line_mods(self, new_entries, mods):
-        for entry in self.f:
+        for index, entry in enumerate(self.f, 1):
             applied_mods = []
             lines = []
 
@@ -147,13 +170,22 @@ class SubtitleModifications(object):
             start_tags = []
             end_tags = []
 
+            t = entry.text.strip()
+            if not t:
+                if self.debug:
+                    logger.debug(u"Skipping empty line: %s", index)
+                continue
+
             skip_entry = False
-            for line in entry.text.split(ur"\N"):
+            for line in t.split(ur"\N"):
                 # don't bother the mods with surrounding tags
                 old_line = line
                 line = line.strip()
                 skip_line = False
                 line_count += 1
+
+                if not line:
+                    continue
 
                 # clean {\X0} tags before processing
                 # fixme: handle nested tags?
@@ -170,16 +202,17 @@ class SubtitleModifications(object):
                     mod = self.initialized_mods[identifier]
 
                     try:
-                        line = mod.modify(line.strip(), entry=entry.text, debug=self.debug, parent=self, **args)
+                        line = mod.modify(line.strip(), entry=entry.text, debug=self.debug, parent=self, index=index,
+                                          **args)
                     except EmptyEntryError:
                         if self.debug:
-                            logger.debug(u"%s: %r -> ''", identifier, entry.text)
+                            logger.debug(u"%d: %s: %r -> ''", index, identifier, entry.text)
                         skip_entry = True
                         break
 
                     if not line:
                         if self.debug:
-                            logger.debug(u"%s: %r -> ''", identifier, old_line)
+                            logger.debug(u"%d: %s: %r -> ''", index, identifier, old_line)
                         skip_line = True
                         break
 
@@ -211,12 +244,12 @@ class SubtitleModifications(object):
                     lines.append(cleaned_line)
                 else:
                     if self.debug:
-                        logger.debug(u"Ditching now empty line (%r)", line)
+                        logger.debug(u"%d: Ditching now empty line (%r)", index, line)
 
             if not lines:
                 # don't bother logging when the entry only had one line
                 if self.debug and line_count > 1:
-                    logger.debug(u"%r -> ''", entry.text)
+                    logger.debug(u"%d: %r -> ''", index, entry.text)
                 continue
 
             new_text = ur"\N".join(lines)
@@ -239,6 +272,8 @@ class SubtitleModifications(object):
                     if self.debug:
                         logger.debug(u"Fixing tags: %s (%r -> %r)", str(add_start_tags+add_end_tags), new_text,
                                      entry.text)
+                else:
+                    entry.text = new_text
             else:
                 entry.text = new_text
 

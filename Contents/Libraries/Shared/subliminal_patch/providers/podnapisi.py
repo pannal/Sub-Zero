@@ -2,12 +2,15 @@
 
 import logging
 import re
+import io
 
+from zipfile import ZipFile
 from lxml.etree import XMLSyntaxError
 
 from guessit import guessit
 from subliminal.subtitle import guess_matches
 from subliminal.utils import sanitize
+from subliminal_patch.providers.mixins import ProviderSubtitleArchiveMixin
 
 try:
     from lxml import etree
@@ -16,11 +19,12 @@ except ImportError:
         import xml.etree.cElementTree as etree
     except ImportError:
         import xml.etree.ElementTree as etree
-from babelfish import Language, language_converters
+from babelfish import language_converters
 from subliminal import Episode
 from subliminal import Movie
 from subliminal.providers.podnapisi import PodnapisiProvider as _PodnapisiProvider, \
     PodnapisiSubtitle as _PodnapisiSubtitle
+from subzero.language import Language
 
 logger = logging.getLogger(__name__)
 
@@ -30,10 +34,13 @@ class PodnapisiSubtitle(_PodnapisiSubtitle):
     hearing_impaired_verifiable = True
 
     def __init__(self, language, hearing_impaired, page_link, pid, releases, title, season=None, episode=None,
-                 year=None):
+                 year=None, asked_for_release_group=None, asked_for_episode=None):
         super(PodnapisiSubtitle, self).__init__(language, hearing_impaired, page_link, pid, releases, title,
                                                 season=season, episode=episode, year=year)
         self.release_info = u", ".join(releases)
+        self.asked_for_release_group = asked_for_release_group
+        self.asked_for_episode = asked_for_episode
+        self.matches = None
 
     def get_matches(self, video):
         """
@@ -46,7 +53,8 @@ class PodnapisiSubtitle(_PodnapisiSubtitle):
         # episode
         if isinstance(video, Episode):
             # series
-            if video.series and sanitize(self.title) == sanitize(video.series):
+            if video.series and (sanitize(self.title) in (
+                    sanitize(name) for name in [video.series] + video.alternative_series)):
                 matches.add('series')
             # year
             if video.original_series and self.year is None or video.year and video.year == self.year:
@@ -63,7 +71,8 @@ class PodnapisiSubtitle(_PodnapisiSubtitle):
         # movie
         elif isinstance(video, Movie):
             # title
-            if video.title and sanitize(self.title) == sanitize(video.title):
+            if video.title and (sanitize(self.title) in (
+                    sanitize(name) for name in [video.title] + video.alternative_titles)):
                 matches.add('title')
             # year
             if video.year and self.year == video.year:
@@ -72,10 +81,12 @@ class PodnapisiSubtitle(_PodnapisiSubtitle):
             for release in self.releases:
                 matches |= guess_matches(video, guessit(release, {'type': 'movie', "single_value": True}))
 
+        self.matches = matches
+
         return matches
 
 
-class PodnapisiProvider(_PodnapisiProvider):
+class PodnapisiProvider(_PodnapisiProvider, ProviderSubtitleArchiveMixin):
     languages = ({Language('por', 'BR'), Language('srp', script='Latn'), Language('srp', script='Cyrl')} |
                  {Language.fromalpha2(l) for l in language_converters['alpha2'].codes})
 
@@ -97,15 +108,24 @@ class PodnapisiProvider(_PodnapisiProvider):
             logger.info("%s can't search for specials right now, skipping", self)
             return []
 
+        season = episode = None
         if isinstance(video, Episode):
-            return [s for l in languages for s in self.query(l, video.series, season=video.season,
-                                                             episode=video.episode, year=video.year,
-                                                             only_foreign=self.only_foreign)]
-        elif isinstance(video, Movie):
-            return [s for l in languages for s in self.query(l, video.title, year=video.year,
-                                                             only_foreign=self.only_foreign)]
+            titles = [video.series] + video.alternative_series
+            season = video.season
+            episode = video.episode
+        else:
+            titles = [video.title] + video.alternative_titles
 
-    def query(self, language, keyword, season=None, episode=None, year=None, only_foreign=False):
+        for title in titles:
+            subtitles = [s for l in languages for s in
+                         self.query(l, title, video, season=season, episode=episode, year=video.year,
+                                    only_foreign=self.only_foreign)]
+            if subtitles:
+                return subtitles
+
+        return []
+
+    def query(self, language, keyword, video, season=None, episode=None, year=None, only_foreign=False):
         search_language = str(language).lower()
 
         # sr-Cyrl specialcase
@@ -146,6 +166,11 @@ class PodnapisiProvider(_PodnapisiProvider):
             # loop over subtitles
             for subtitle_xml in xml.findall('subtitle'):
                 # read xml elements
+                pid = subtitle_xml.find('pid').text
+                # ignore duplicates, see http://www.podnapisi.net/forum/viewtopic.php?f=62&t=26164&start=10#p213321
+                if pid in pids:
+                    continue
+
                 language = Language.fromietf(subtitle_xml.find('language').text)
                 hearing_impaired = 'n' in (subtitle_xml.find('flags').text or '')
                 foreign = 'f' in (subtitle_xml.find('flags').text or '')
@@ -156,26 +181,24 @@ class PodnapisiProvider(_PodnapisiProvider):
                     continue
 
                 page_link = subtitle_xml.find('url').text
-                pid = subtitle_xml.find('pid').text
                 releases = []
                 if subtitle_xml.find('release').text:
                     for release in subtitle_xml.find('release').text.split():
                         releases.append(re.sub(r'\.+$', '', release))  # remove trailing dots
                 title = subtitle_xml.find('title').text
-                season = int(subtitle_xml.find('tvSeason').text)
-                episode = int(subtitle_xml.find('tvEpisode').text)
-                year = int(subtitle_xml.find('year').text)
+                r_season = int(subtitle_xml.find('tvSeason').text)
+                r_episode = int(subtitle_xml.find('tvEpisode').text)
+                r_year = int(subtitle_xml.find('year').text)
 
                 if is_episode:
                     subtitle = self.subtitle_class(language, hearing_impaired, page_link, pid, releases, title,
-                                                   season=season, episode=episode, year=year)
+                                                   season=r_season, episode=r_episode, year=r_year,
+                                                   asked_for_release_group=video.release_group,
+                                                   asked_for_episode=episode)
                 else:
                     subtitle = self.subtitle_class(language, hearing_impaired, page_link, pid, releases, title,
-                                                   year=year)
+                                                   year=r_year, asked_for_release_group=video.release_group)
 
-                # ignore duplicates, see http://www.podnapisi.net/forum/viewtopic.php?f=62&t=26164&start=10#p213321
-                if pid in pids:
-                    continue
 
                 logger.debug('Found subtitle %r', subtitle)
                 subtitles.append(subtitle)
@@ -188,5 +211,16 @@ class PodnapisiProvider(_PodnapisiProvider):
             # increment current page
             params['page'] = int(xml.find('pagination/current').text) + 1
             logger.debug('Getting page %d', params['page'])
+            xml = None
 
         return subtitles
+
+    def download_subtitle(self, subtitle):
+        # download as a zip
+        logger.info('Downloading subtitle %r', subtitle)
+        r = self.session.get(self.server_url + subtitle.pid + '/download', params={'container': 'zip'}, timeout=10)
+        r.raise_for_status()
+
+        # open the zip
+        with ZipFile(io.BytesIO(r.content)) as zf:
+            subtitle.content = self.get_subtitle_from_archive(subtitle, zf)

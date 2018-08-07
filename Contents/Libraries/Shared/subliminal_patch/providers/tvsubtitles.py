@@ -1,14 +1,14 @@
 # coding=utf-8
 
-import re
 import logging
-from babelfish import Language
+
+
+from subzero.language import Language
 from subliminal.providers import ParserBeautifulSoup
-from subliminal.cache import SHOW_EXPIRATION_TIME, region
+from subliminal.cache import SHOW_EXPIRATION_TIME, region, EPISODE_EXPIRATION_TIME
 from subliminal.providers.tvsubtitles import TVsubtitlesProvider as _TVsubtitlesProvider, \
-    TVsubtitlesSubtitle as _TVsubtitlesSubtitle, link_re
+    TVsubtitlesSubtitle as _TVsubtitlesSubtitle, link_re, episode_id_re
 from subliminal.utils import sanitize
-from subliminal_patch.extensions import provider_registry
 
 logger = logging.getLogger(__name__)
 
@@ -54,17 +54,55 @@ class TVsubtitlesProvider(_TVsubtitlesProvider):
                 logger.debug('Found show id %d', show_id)
                 break
 
+        soup.decompose()
+        soup = None
+
         return show_id
 
-    def query(self, series, season, episode, year=None):
-        # search the show id
-        show_id = self.search_show_id(series, year)
-        if show_id is None:
-            logger.error('No show id found for %r (%r)', series, {'year': year})
-            return []
+    @region.cache_on_arguments(expiration_time=EPISODE_EXPIRATION_TIME)
+    def get_episode_ids(self, show_id, season):
+        """Get episode ids from the show id and the season.
 
+        :param int show_id: show id.
+        :param int season: season of the episode.
+        :return: episode ids per episode number.
+        :rtype: dict
+
+        """
+        # get the page of the season of the show
+        logger.info('Getting the page of show id %d, season %d', show_id, season)
+        r = self.session.get(self.server_url + 'tvshow-%d-%d.html' % (show_id, season), timeout=10)
+        soup = ParserBeautifulSoup(r.content, ['lxml', 'html.parser'])
+
+        # loop over episode rows
+        episode_ids = {}
+        for row in soup.select('table#table5 tr'):
+            # skip rows that do not have a link to the episode page
+            if not row('a', href=episode_id_re):
+                continue
+
+            # extract data from the cells
+            cells = row('td')
+            episode = int(cells[0].text.split('x')[1])
+            episode_id = int(cells[1].a['href'][8:-5])
+            episode_ids[episode] = episode_id
+
+        if episode_ids:
+            logger.debug('Found episode ids %r', episode_ids)
+        else:
+            logger.warning('No episode ids found')
+
+        soup.decompose()
+        soup = None
+
+        return episode_ids
+
+    def query(self, show_id, series, season, episode, year=None):
         # get the episode ids
         episode_ids = self.get_episode_ids(show_id, season)
+        # Provider doesn't store multi episode information
+        episode = min(episode) if episode and isinstance(episode, list) else episode
+
         if episode not in episode_ids:
             logger.error('Episode %d not found', episode)
             return []
@@ -82,11 +120,14 @@ class TVsubtitlesProvider(_TVsubtitlesProvider):
             subtitle_id = int(row.parent['href'][10:-5])
             page_link = self.server_url + 'subtitle-%d.html' % subtitle_id
             rip = row.find('p', title='rip').text.strip() or None
-            release = row.find('p', title='release').text.strip() or None
+            release = row.find('h5').text.strip() or None
 
             subtitle = self.subtitle_class(language, page_link, subtitle_id, series, season, episode, year, rip,
                                            release)
             logger.info('Found subtitle %s', subtitle)
             subtitles.append(subtitle)
+
+        soup.decompose()
+        soup = None
 
         return subtitles

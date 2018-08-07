@@ -16,14 +16,16 @@ class SubtitleModification(object):
     args_mergeable = False
     order = None
     modifies_whole_file = False  # operates on the whole file, not individual entries
+    apply_last = False
     pre_processors = []
     processors = []
     post_processors = []
+    languages = []
 
     def __init__(self, parent):
         return
 
-    def _process(self, content, processors, debug=False, parent=None, **kwargs):
+    def _process(self, content, processors, debug=False, parent=None, index=None, **kwargs):
         if not content:
             return
 
@@ -40,12 +42,13 @@ class SubtitleModification(object):
             new_content = processor.process(new_content, debug=debug, **kwargs)
             if not new_content:
                 if debug:
-                    logger.debug("Processor returned empty line: %s", processor)
+                    logger.debug("Processor returned empty line: %s", processor.name)
                 break
             if debug:
                 if old_content == new_content:
                     continue
-                logger.debug("%s: %s -> %s", processor, repr(old_content), repr(new_content))
+                logger.debug("%d: %s: %s -> %s", index, processor.name, repr(old_content), repr(new_content))
+
         return new_content
 
     def pre_process(self, content, debug=False, parent=None, **kwargs):
@@ -83,6 +86,7 @@ class SubtitleTextModification(SubtitleModification):
     pass
 
 
+TAG = ur"(?:\s*{\\[iusb][0-1]}\s*)*"
 EMPTY_TAG_PROCESSOR = ReProcessor(re.compile(r'({\\\w1})[\s.,-_!?]*({\\\w0})'), "", name="empty_tag")
 
 empty_line_post_processors = [

@@ -47,7 +47,7 @@ class SubripFormat(FormatBase):
 
         def prepare_text(lines):
             s = "".join(lines).strip()
-            s = re.sub(r"\n+ *\d+ *$", "", s) # strip number of next subtitle
+            s = re.sub(r"\n* *\d+ *$", "", s) # strip number of next subtitle
             s = re.sub(r"< *i *>", r"{\i1}", s)
             s = re.sub(r"< */ *i *>", r"{\i0}", s)
             s = re.sub(r"< *s *>", r"{\s1}", s)
@@ -55,6 +55,7 @@ class SubripFormat(FormatBase):
             s = re.sub(r"< *u *>", "{\\u1}", s) # not r" for Python 2.7 compat, triggers unicodeescape
             s = re.sub(r"< */ *u *>", "{\\u0}", s)
             s = re.sub(r"< */? *[a-zA-Z][^>]*>", "", s) # strip other HTML tags
+            s = re.sub(r"\r", "", s)  # convert newlines
             s = re.sub(r"\n", r"\N", s) # convert newlines
             return s
 

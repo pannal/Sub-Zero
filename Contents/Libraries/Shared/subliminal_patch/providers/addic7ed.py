@@ -1,21 +1,29 @@
 # coding=utf-8
 import logging
 import re
+import datetime
 import subliminal
+import time
 from random import randint
+from dogpile.cache.api import NO_VALUE
+from requests import Session
 
-from subliminal.exceptions import TooManyRequests, DownloadLimitExceeded
-from subliminal.providers.addic7ed import Addic7edProvider as _Addic7edProvider, Addic7edSubtitle as _Addic7edSubtitle, \
-    ParserBeautifulSoup, Language
-from subliminal.cache import SHOW_EXPIRATION_TIME, region
+from subliminal.exceptions import ServiceUnavailable, DownloadLimitExceeded, AuthenticationError
+from subliminal.providers.addic7ed import Addic7edProvider as _Addic7edProvider, \
+    Addic7edSubtitle as _Addic7edSubtitle, ParserBeautifulSoup, show_cells_re
+from subliminal.cache import region
 from subliminal.subtitle import fix_line_ending
-from subliminal.utils import sanitize
-from subliminal_patch.extensions import provider_registry
+from subliminal_patch.utils import sanitize
+from subliminal_patch.exceptions import TooManyRequests
+
+from subzero.language import Language
 
 logger = logging.getLogger(__name__)
 
 #: Series header parsing regex
-series_year_re = re.compile(r'^(?P<series>[ \w\'.:(),&!?-]+?)(?: \((?P<year>\d{4})\))?$')
+series_year_re = re.compile(r'^(?P<series>[ \w\'.:(),*&!?-]+?)(?: \((?P<year>\d{4})\))?$')
+
+SHOW_EXPIRATION_TIME = datetime.timedelta(weeks=1).total_seconds()
 
 
 class Addic7edSubtitle(_Addic7edSubtitle):
@@ -57,18 +65,52 @@ class Addic7edProvider(_Addic7edProvider):
     hearing_impaired_verifiable = True
     subtitle_class = Addic7edSubtitle
 
+    sanitize_characters = {'-', ':', '(', ')', '.', '/'}
+
     def __init__(self, username=None, password=None, use_random_agents=False):
         super(Addic7edProvider, self).__init__(username=username, password=password)
         self.USE_ADDICTED_RANDOM_AGENTS = use_random_agents
 
     def initialize(self):
-        # patch: add optional user agent randomization
-        super(Addic7edProvider, self).initialize()
+        self.session = Session()
+        self.session.headers['User-Agent'] = 'Subliminal/%s' % subliminal.__short_version__
+
         if self.USE_ADDICTED_RANDOM_AGENTS:
             from .utils import FIRST_THOUSAND_OR_SO_USER_AGENTS as AGENT_LIST
-            logger.debug("addic7ed: using random user agents")
+            logger.debug("Addic7ed: using random user agents")
             self.session.headers['User-Agent'] = AGENT_LIST[randint(0, len(AGENT_LIST) - 1)]
             self.session.headers['Referer'] = self.server_url
+
+        # login
+        if self.username and self.password:
+            ccks = region.get("addic7ed_cookies", expiration_time=86400)
+            do_login = False
+            if ccks != NO_VALUE:
+                self.session.cookies.update(ccks)
+                r = self.session.get(self.server_url + 'panel.php', allow_redirects=False, timeout=10)
+                if r.status_code == 302:
+                    logger.info('Addic7ed: Login expired')
+                    do_login = True
+                else:
+                    logger.info('Addic7ed: Reusing old login')
+                    self.logged_in = True
+
+            if do_login:
+                logger.info('Addic7ed: Logging in')
+                data = {'username': self.username, 'password': self.password, 'Submit': 'Log in'}
+                r = self.session.post(self.server_url + 'dologin.php', data, allow_redirects=False, timeout=10)
+
+                if "relax, slow down" in r.content:
+                    raise TooManyRequests(self.username)
+
+                if r.status_code != 302:
+                    raise AuthenticationError(self.username)
+
+                region.set("addic7ed_cookies", r.cookies)
+
+                logger.debug('Addic7ed: Logged in')
+                self.logged_in = True
+
 
     @region.cache_on_arguments(expiration_time=SHOW_EXPIRATION_TIME)
     def _get_show_ids(self):
@@ -82,12 +124,21 @@ class Addic7edProvider(_Addic7edProvider):
         logger.info('Getting show ids')
         r = self.session.get(self.server_url + 'shows.php', timeout=10)
         r.raise_for_status()
-        soup = ParserBeautifulSoup(r.content, ['lxml', 'html.parser'])
+
+        # LXML parser seems to fail when parsing Addic7ed.com HTML markup.
+        # Last known version to work properly is 3.6.4 (next version, 3.7.0, fails)
+        # Assuming the site's markup is bad, and stripping it down to only contain what's needed.
+        show_cells = re.findall(show_cells_re, r.content)
+        if show_cells:
+            soup = ParserBeautifulSoup(b''.join(show_cells), ['lxml', 'html.parser'])
+        else:
+            # If RegEx fails, fall back to original r.content and use 'html.parser'
+            soup = ParserBeautifulSoup(r.content, ['html.parser'])
 
         # populate the show ids
         show_ids = {}
         for show in soup.select('td.version > h3 > a[href^="/show/"]'):
-            show_clean = sanitize(show.text)
+            show_clean = sanitize(show.text, default_characters=self.sanitize_characters)
             try:
                 show_id = int(show['href'][6:])
             except ValueError:
@@ -98,6 +149,9 @@ class Addic7edProvider(_Addic7edProvider):
             if match and match.group(2) and match.group(1) not in show_ids:
                 # year found, also add it without year
                 show_ids[match.group(1)] = show_id
+
+        soup.decompose()
+        soup = None
 
         logger.debug('Found %d show ids', len(show_ids))
 
@@ -123,37 +177,67 @@ class Addic7edProvider(_Addic7edProvider):
 
         # make the search
         logger.info('Searching show ids with %r', params)
-        r = self.session.get(self.server_url + 'search.php', params=params, timeout=10)
-        r.raise_for_status()
+
+        # currently addic7ed searches via srch.php from the front page, then a re-search is needed which calls
+        # search.php
+        for endpoint in ("srch.php", "search.php",):
+            headers = None
+            if endpoint == "search.php":
+                headers = {
+                    "referer": self.server_url + "srch.php"
+                }
+            r = self.session.get(self.server_url + endpoint, params=params, timeout=10, headers=headers)
+            r.raise_for_status()
+
+            if r.content and "Sorry, your search" not in r.content:
+                break
+
+            time.sleep(4)
+
         if r.status_code == 304:
             raise TooManyRequests()
+
         soup = ParserBeautifulSoup(r.content, ['lxml', 'html.parser'])
 
+        suggestion = None
+
         # get the suggestion
-        suggestion = soup.select('span.titulo > a[href^="/show/"]')
-        if not suggestion:
-            logger.warning('Show id not found: no suggestion')
-            return None
-        if not sanitize(suggestion[0].i.text.replace('\'', ' ')) == sanitize(series_year):
-            logger.warning('Show id not found: suggestion does not match')
-            return None
-        show_id = int(suggestion[0]['href'][6:])
-        logger.debug('Found show id %d', show_id)
+        try:
+            suggestion = soup.select('span.titulo > a[href^="/show/"]')
+            if not suggestion:
+                logger.warning('Show id not found: no suggestion')
+                return None
+            if not sanitize(suggestion[0].i.text.replace('\'', ' '),
+                            default_characters=self.sanitize_characters) == \
+                    sanitize(series_year, default_characters=self.sanitize_characters):
+                logger.warning('Show id not found: suggestion does not match')
+                return None
+            show_id = int(suggestion[0]['href'][6:])
+            logger.debug('Found show id %d', show_id)
 
-        return show_id
+            return show_id
+        finally:
+            soup.decompose()
+            soup = None
 
-    def query(self, series, season, year=None, country=None):
+    def query(self, show_id, series, season, year=None, country=None):
         # patch: fix logging
-        # get the show id
-        show_id = self.get_show_id(series, year, country)
-        if show_id is None:
-            logger.error('No show id found for %r (%r)', series, {'year': year, 'country': country})
-            return []
 
         # get the page of the season of the show
         logger.info('Getting the page of show id %d, season %d', show_id, season)
-        r = self.session.get(self.server_url + 'show/%d' % show_id, params={'season': season}, timeout=10)
+        r = self.session.get(self.server_url + 'ajax_loadShow.php',
+                             params={'show': show_id, 'season': season},
+                             timeout=10,
+                             headers={
+                                 "referer": "%sshow/%s" % (self.server_url, show_id),
+                                 "X-Requested-With": "XMLHttpRequest"
+                             }
+                             )
+
         r.raise_for_status()
+
+        if r.status_code == 304:
+            raise TooManyRequests()
 
         if not r.content:
             # Provider wrongful return a status of 304 Not Modified with an empty content
@@ -190,6 +274,9 @@ class Addic7edProvider(_Addic7edProvider):
             logger.debug('Found subtitle %r', subtitle)
             subtitles.append(subtitle)
 
+        soup.decompose()
+        soup = None
+
         return subtitles
 
     def download_subtitle(self, subtitle):
@@ -197,6 +284,9 @@ class Addic7edProvider(_Addic7edProvider):
         r = self.session.get(self.server_url + subtitle.download_link, headers={'Referer': subtitle.page_link},
                              timeout=10)
         r.raise_for_status()
+
+        if r.status_code == 304:
+            raise TooManyRequests()
 
         if not r.content:
             # Provider wrongful return a status of 304 Not Modified with an empty content

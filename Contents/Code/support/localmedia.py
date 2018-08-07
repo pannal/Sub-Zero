@@ -9,29 +9,33 @@ import subtitlehelpers
 from config import config as sz_config
 
 
+SECONDARY_TAGS = ['forced', 'normal', 'default', 'embedded', 'embedded-forced', 'custom', 'hi', 'cc', 'sdh']
+
+
 def find_subtitles(part):
     lang_sub_map = {}
     part_filename = helpers.unicodize(part.file)
     part_basename = os.path.splitext(os.path.basename(part_filename))[0]
     use_filesystem = helpers.cast_bool(Prefs["subtitles.save.filesystem"])
-    paths = [os.path.dirname(part_filename)] if use_filesystem else []
+    sub_dir_custom = Prefs["subtitles.save.subFolder.Custom"].strip() \
+        if Prefs["subtitles.save.subFolder.Custom"] else None
 
-    global_subtitle_folder = None
+    use_sub_subfolder = Prefs["subtitles.save.subFolder"] != "current folder" and not sub_dir_custom
+    sub_subfolder = None
+    paths = [os.path.dirname(part_filename)] if use_filesystem else []
 
     global_folders = []
 
     if use_filesystem:
         # Check for local subtitles subdirectory
         sub_dir_base = paths[0]
-
         sub_dir_list = []
 
-        if Prefs["subtitles.save.subFolder"] != "current folder":
+        if use_sub_subfolder:
             # got selected subfolder
-            sub_dir_list.append(os.path.join(sub_dir_base, Prefs["subtitles.save.subFolder"]))
-
-        sub_dir_custom = Prefs["subtitles.save.subFolder.Custom"].strip() \
-            if Prefs["subtitles.save.subFolder.Custom"] else None
+            sub_subfolder = os.path.join(sub_dir_base, Prefs["subtitles.save.subFolder"])
+            sub_dir_list.append(sub_subfolder)
+            sub_subfolder = os.path.normpath(helpers.unicodize(sub_subfolder))
 
         if sub_dir_custom:
             # got custom subfolder
@@ -84,8 +88,12 @@ def find_subtitles(part):
                 media_files.append(root)
 
     # cleanup any leftover subtitle if no associated media file was found
-    if helpers.cast_bool(Prefs["subtitles.autoclean"]):
+    if use_filesystem and helpers.cast_bool(Prefs["subtitles.autoclean"]):
         for path in paths:
+            # only housekeep in sub_subfolder if sub_subfolder is used
+            if use_sub_subfolder and path != sub_subfolder and not sz_config.advanced.thorough_cleaning:
+                continue
+
             # we can't housekeep the global subtitle folders as we don't know about *all* media files
             # in a library; skip them
             skip_path = False
@@ -105,11 +113,10 @@ def find_subtitles(part):
                 if os.path.isfile(enc_fn):
                     (root, ext) = os.path.splitext(file_path_listing)
                     # it's a subtitle file
-                    if ext.lower()[1:] in config.SUBTITLE_EXTS:
+                    if ext.lower()[1:] in config.SUBTITLE_EXTS_BASE:
                         # get fn without forced/default/normal tag
                         split_tag = root.rsplit(".", 1)
-                        if len(split_tag) > 1 and split_tag[1].lower() in ['forced', 'normal', 'default', 'embedded',
-                                                                           'custom']:
+                        if len(split_tag) > 1 and split_tag[1].lower() in SECONDARY_TAGS:
                             root = split_tag[0]
 
                         # get associated media file name without language
@@ -135,7 +142,7 @@ def find_subtitles(part):
         # get fn without forced/default/normal tag
         split_tag = local_basename.rsplit(".", 1)
         has_additional_tag = False
-        if len(split_tag) > 1 and split_tag[1].lower() in ['forced', 'normal', 'default', 'embedded', 'custom']:
+        if len(split_tag) > 1 and split_tag[1].lower() in SECONDARY_TAGS:
             local_basename = split_tag[0]
             has_additional_tag = True
 
@@ -159,7 +166,7 @@ def find_subtitles(part):
                 continue
 
         # determine whether to pick up the subtitle based on our match strictness
-        elif not filename_matches_part:
+        if not filename_matches_part:
             if sz_config.ext_match_strictness == "strict" or (
                             sz_config.ext_match_strictness == "loose" and not filename_contains_part):
                 # Log.Debug("%s doesn't match %s, skipping" % (helpers.unicodize(local_filename),

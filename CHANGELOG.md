@@ -1,3 +1,376 @@
+
+2.5.4.2541
+
+- core: try retrieving advanced_settings.json from the path given, which may be a file path or a directory
+- menu: ignore options: fix plugin not responding, fix unicode strings; resolve #509
+- providers: addic7ed: fix usage/adapt to new show search method
+- providers: opensubtitles: properly handle responses again, re-enable automatic throttling based on those (broken since XMLRPC handler rewrite)
+
+
+2.5.4.2527
+
+- core: bugfixes
+- core: get_item: don't fail on socket timeout; fixes #498
+- core: fix scandir encoding errors; #453 #461 #441
+- core: clamp menu history to 25 items
+- add UnRAR for aarch64 (untested), arm (armv5tel, untested), linux/i386, MacOSX/i386; fixes #311
+- add 3rd party licenses
+- menu: new debounce/history mechanism; fixes the back button usage
+- config: add custom path option for advanced_settings.json
+- providers: opensubtitles: re-add support for throttling based on HTTP response codes, which got ditched due to new connection interface
+- providers: legendastv: disable if unrar wasn't found
+- providers: addic7ed: reduce show cache to 1 week
+- advanced settings: sonarr/radarr: make ssl verification optional
+- advanced settings: opensubtitles: add configurable connection timeout
+- refiners: drone: use certifi for HTTPS connections
+- tasks: SearchAllRecentlyAddedMissing: fix ZeroDivisionError in edgecases; fixes #496
+
+
+2.5.3.2452
+
+- core: update certifi to 2018.01.18
+- core: metadata storage: only allow one subtitle per language
+- core: metadata storage: only parse latest metadata subtitle in localmedia
+- core: metadata storage: kill existing metadata subtitles explicitly upon storing a new one
+- core: metadata storage: fix selecting current subtitle from menu
+- providers: opensubtitles: use new requests based transport by default, finally fixes ResponseNotReady properly
+- providers: opensubtitles: mask token in logs
+- providers: don't check for hash validity if it isn't verifiable (fixes napiprojekt, #478)
+- submod: common: extend non_word_only matching
+- submod: common: reduce multi spaces to one
+- submod: OCR: fix III'll=I'll
+- advanced settings: add option to use HTTP instead of HTTPS for OpenSubtitles
+
+
+2.5.3.2422
+
+- core: don't fail on embedded subtitle streams without language code set, fixes #473
+- providers: catch ResponseNotReady in list_subtitles_provider as well (partly fixes OpenSubtitles)
+- providers: don't use retry logic in case of ResponseNotReady
+- providers: addic7ed: use new search endpoint
+
+
+2.5.3.2414
+
+- core: expand user agent list
+- core: update subliminal to 4ad5d31
+- core: treat 23.976, 23.98, 24.0 fps as equal
+- core: correctly skip blacklist entries when iterating through currently known subs
+- core: fix unpacking of packs without asked-for-release-group
+- core: fix embedded subtitle language detection; add debug log
+- core: treat embedded subtitle containing "forced" in its title as forced
+- core: improve embedded subtitles detection
+- core: store extracted embedded forced subtitles with the "forced" suffix (e.g.: video.en.forced.srt)
+- core: don't bother trying to extract embedded subtitle if transcoder wasn't found
+- core: fix automatic extraction of unknown embedded subtitle streams
+- core: skip immediately searching for new subtitle after successfully extracting embedded
+- core: extract embedded ASS: don't transcode to SRT using ffmpeg (Plex Transcoder), do the transcoding later using pysubs2; fixes offset issues
+- core: extract embedded: let ffmpeg auto convert mov_text/tx3g to srt
+- core: fix transcoder detection; add fallback #460
+- core: remove LD_LIBRARY_PATH from environment before calling notification executable
+- core: auto extract embedded subtitles in a separate thread
+- core: reduce encoding change log spam
+- core: only allow one automatic extraction at a time; add optional advanced settings "auto_extract_multithread"
+- core: add minimum score a subtitle has to have when considered by the find better subtitles task, when the current subtitle is an extracted embedded one; add advanced_settings entries
+- core/config: automatic extraction: add config setting to indicate whether there should be an immediate search for available subtitles after extraction or not (default: off)
+- core/menu/submod: add reverse_rtl modification for Hebrew; fixes #409
+- core: scoring: assume title match on tvdb_id match
+- tasks: search all recently added missing: fix attribute access on missing stored subtitle info
+- providers: add hosszupuska (hungarian, thanks morpheus133 for the basic implementation)
+- providers: add argenteam (spanish, thanks mmiraglia for the basic implementation)
+- providers: addic7ed: use random user agent by default (enforce for existing configs)
+- providers: enable subscene by default
+- providers: opensubtitles: add fallback for dict based query response in contrast to list/array based
+- advanced settings: make text-based-subtitle-formats configurable
+- menu: submod: inverse-reverse subtitle timing time-choices for better accessibility
+- submod: reduce log spam in case of debug logs enabled
+- submod: style tags could result in no output at all
+- submod: fix empty content if only non-line-mods were used, no line-mods; fixes #449
+- submod: HI: correctly handle style tags when checking for brackets
+- submod: HI: don't remove anything that's surrounded by quotes
+- submod: HI: double or triple dash is em dash
+- submod: HI: HI_before_colon_noncaps, don't assume single quotes are sentence enders
+- submod: common: don't uppercase after abbreviations
+- submod: common: don't break phone numbers (more than one spaced number pair found)
+- submod: common: also count lines only consisting of dots as removable
+- submod: common: replace more than 3 consecutive dots with 3 dots
+- submod: OCR: "H i." = "Hi."
+
+
+2.5.0.2287
+
+- core: reduce main icon size
+- core: fix usage on NVIDIA SHIELD (hopefully, please report back), #441
+- core: add scandir fallback to listdir in case of badly configured locale in environment, #441, #440
+- core: get subtitles from archive: don't assume an episode match
+- core: get subtitles from archive: don't assume any attributes in guess
+- core: improve release group detection for drone/filebot/file_info refiners
+- core: fix language detection for embedded subtitle streams
+- core: support extraction of embedded mov_text subtitles in mp4 video files
+- refiners: drone: add http:// to url if not given
+- providers: opensubtitles: retry/reinitialize request when encountering ResponseNotReady
+- config: clarify subscene being only enabled for TV series by default
+- menu: when encountering permission errors when scanning media files, warn in the menu about them
+- submod: common: don't break -- addic7ed --
+- submod: common: remove lines that consist only of dash, underscore
+- submod: OCR: fix Ls = Is
+- submod: OCR: fix bad HI colons (ANNOUNCER; instead of ANNOUNCER:)
+- submod: common: fix lines consisting only of bad music symbols (*#¶ = ♪)
+- submod: HI: remove music-symbol-only-lines
+- submod: HI: be less aggressive about lines ending with a colon; please re-apply all your mods via advanced menu
+- submod: OCR: fix it'sjust, isn'tjust, Iam, Ican
+
+
+2.5.0.2247
+- fix ignoring by-hash-matched episodes
+
+
+2.5.0.2241
+
+- fix issue when removing crap from filenames to not accidentally remove release group #436
+- fix initialization of soft ignore list after upgrade fron 2.0
+
+
+2.5.0.2221
+
+- refiners: add support for retrieving original filename from
+ 	- drone derivates: sonarr, radarr
+ 	- filebot
+ 	- symlinks
+    - file_info meta file lists (see wiki)
+
+- providers: add subscene (disabled by default to not flood subscene on release)
+    - normal search
+    - season pack search if season has concluded
+
+- core: add provider subtitle-archive/pack cache for retrieving single subtitles from previously downloaded (season-) packs (subscene)
+- core/agent: massive performance improvements over 2.0
+- core/agent/background-tasks: reduce memory usage to a fraction of 2.0
+- core/providers: add dynamic provider throttling when certain events occur (ServiceUnavailable, too many downloads, ...), to lighten the provider-load
+- core/agent/config: automatically extract embedded subtitles (and use them if no current subtitle)
+- core: fix internal subtitle info storage issues
+- core: always store internal subtitle information even if no subtitle was downloaded (fixes SearchAllRecentlyAddedMissing)
+- core: fix internal subtitle info storage on windows (gzip handling is broken there)
+- core: don't fail on missing logfile paths
+- core: fix default encoding order for non-script-serbian
+- core: improve logging
+- core: add AsRequested to cleanup garbage names
+- core: treat SDTV and HDTV the same when searching for subtitles
+- core: parse_video: trust PMS season and episode numbers
+- core: parse_video: add series year information from PMS if none found
+- core: upgrade dependencies
+- core: update subliminal to 62cdb3c
+- core: add new file based cache mechanism, rendering DBM/memory backends obsolete
+- core: treat 23.980 fps as 23.976 and vice-versa
+- core: add HTTP proxy support for querying the providers (supports credentials)
+- core: only compute file hashes for enabled providers
+- core: massive speedup; refine only when needed, exit early otherwise
+- core: store last modified timestamp in subtitle info storage
+- core: only write to subtitle info storage if we haven't had one or any subtitle was downloaded
+- core: only clean up the sub-folder if a subtitle-sub-folder has been selected, and not the parent one also
+- core: support for CP437 encoded filenames in ZIP-Archives
+- core: use scandir library instead of os.listdir if possible, reducing performance-impact
+- core: archives: support multi-episode subtitles (partly)
+- core: subtitle cleanup: add support for hi, cc, sdh secondary filename tags; don't autoclean .txt
+- core: increase request timeout by three times in case a proxy is being used
+- core: fix language=Unknown in Plex when "Restrict to one language"-setting is set
+- core: refining: re-add old detected title as alternative title after re-refining with plex metadata's title; fixes #428
+- core: implement advanced_settings.json (see advanced_settings.json.template for reference, copy to "Plug-in Support/Data/com.plexapp.agents.subzero" to use it)
+- core/tasks: fix search all recently added missing (the total number of items will change in the menu while running), reduces memory usage
+- core/menu: add support for extracting embedded subtitles using the builtin plex transcoder
+- core/menu: skip wrong season or episode in returned subtitle results
+- core/config: fix language handling if treat undefined as first language is set
+- providers: remove shooter.cn
+- providers: add support for zip/rar archives containing more than one subtitle file
+- submod: common: remove redundant interpunction ("Hello !!!" -> "Hello!")
+- submod: skip provider hashing when applying mods
+- submod: correctly drop empty line (fixing broken display)
+- submod: OCR: fix F'xxxxx -> Fxxxxx
+- submod: HI: improve bracket matching
+- submod: OCR: fix l/L instead of I more aggressively
+- submod: common: fix uppercase I's in lowercase words more aggressively
+- submod: HI: improve HI_before_colon
+- submod: common: be more aggressive when fixing numbers; correctly space out spaced ellipses; don't break spaced ellipses; handle multiple spaces in numbers
+- menu: add support for extracting embedded subtitles for a whole season
+- menu: add reapply mods to current subtitle
+- menu: pad titles for more submenus, resulting in detail view in PlexWeb
+- menu: add subtitle selection submenu (if multiple subtitles are inside the subtitle info storage; e.g. previously downloaded ones or extracted embedded)
+- menu: advanced: add skip findbettersubtitles menu item, which sets the last_run to now (for debugging purposes)
+- menu: ignore: add more natural title for seasons and episodes (kills your old ignore lists!)
+- config: skip provider hashing on low impact mode
+- config: add limit by air date setting to consider for FindBetterSubtitles task (default: 1 year)
+- advanced settings: define enabled-for media types per provider
+- advanced settings: define enabled-for languages per provider
+- advanced settings: add deep-clean option (clean up the subtitle-sub-folder and the parent one)
+
+
+
+2.0.33.1871
+- core: normalize line endings in subtitles to LF (\n)
+- core: add subtitle storage lock to avoid race condition
+- core: be more verbose about subtitle storage addition
+- core: fix MPL2 newline parsing, which resulted in broken subtitles
+- core: encoding change: reduce log spam
+- submod: common: fix CM_starting_spacedots
+- opensubtitles: fix request/response handling
+
+
+
+2.0.33.1849
+- opensubtitles: add VIP server handling + preference; VIP benefits: 10€/year, ad-free subs, 1000 subs/day, no-cache VIP server, help SZ and subscribe via http://v.ht/osvip
+- opensubtitles: try to reuse previous token instead of logging in every time
+- core: add throttling between searches (10 seconds)
+- core: fix IETF handling for good
+- core: fix no subtitles being searched in certain situations (when an external subtitle without special tag exists)
+- core: add subtitle blacklist
+- core: fixes
+- core: fix detection of certain PMS media stream language tags ("FR" for example)
+- core: missing subtitles: correctly skip unwanted subtitle extensions
+- core: missing subtitles: honor "treat undefined as first language" option correctly
+- api: add blacklisting endpoints for quickly searching for new subtitls via bookmarklet
+- submod: colors: apply color mods at the end of processing modifications; fix color mods
+- submod: new remove_tags modification to remove all styling tags from subtitles
+- submod: HI: be more aggressive at handling brackets
+- submod: OCR: update en and hrv
+- submod: common: remove "torrent downloaded from ..." lines
+- submod: OCR: fix WholeWord handling, improving modification
+- submod: apply OCR fixes before HI
+- submod: OCR: fix broken HI tag colons (ANNOUNCER'. instead of ANNOUNCER:)
+- menu: advanced: speed up batch modifications
+- menu: add subtitle blacklist
+- menu: recently played: show only TV episodes and movies (music tracks were listed here as well)
+
+
+2.0.29.1767
+- core: fix internal subtitle storage issues
+- core: handle "embedded-forced" tag (futureproofing)
+- core: remove more garbage tags from release groups (nzbgeek, chamele0n, buymore, xpost, postbot)
+- submod: OCR fix: fix music icon = paragraph
+
+
+2.0.29.1756
+- core: don't fail on uppercase file extensions
+- core: don't re-download a subtitle if we already downloaded one, it still physically exists and external subtitles are configured to be ignored
+- core: fix VTT subtitle duplication
+- core: if forced subtitles not explicitly wanted, ignore existing forced subtitles when searching
+- core: add full IETF language support for `Treat languages with country attribute as ISO 639-1 (e.g. don't download pt-BR if pt subtitle exists)`-setting for embedded subtitles
+- menu: remove buggy dynamic permission-based channel icon introduced in 1715
+- menu: improve `Items with missing subtitles` menu usage and item display
+- menu: `Advanced -> Get my logs` handle custom domains without port
+- menu: correctly show country/script part of languages with such attributes (e.g. pt-BR)
+- config: rename `Scan:` settings; make them better understandable and translatable
+- config: rephrase IETF options as "languages with country attribute" (e.g. pt-BR)
+- config: separate IETF options into how to display languages with country attribute and how they should be handled when searching/scanning (e.g. pt-BR)
+- config: `Scheduler: Item age to be considered recent` now can go up to 12 weeks
+- config: `Scheduler: Periodically search for recent items with missing subtitles` added `every 2 hours`
+- submod: swe: add Ĺ to Å
+
+
+2.0.26.1715
+- core: submod: OCR fixes: swe: replace ĺ with å inside words
+- core: fix handling of non-existant PMS audio_codec info
+- core: filename matching ignored the strictness setting in certain global directory configurations (thanks @raduc)
+- core: don't fail on migration errors
+- provider titlovi: handle multiple subtitles per archive
+- provider addic7ed: reset default boost to 19 (was 21)
+- menu: add warning icon on missing permissions
+- menu: manual subtitle list sometimes listed duplicates (thanks @andreashoyer)
+- menu: don't request PMS metadata in item details menu twice
+- menu: don't fail badly on non existant PMS metadata in item details menu
+
+
+2.0.26.1695
+## ATTENTION: THIS RELEASE RESETS YOUR CONFIGURED LANGUAGES TO DEFAULT!
+- core: fix bug that caused SZ not to work for Windows users with special characters in their username
+- core: fix issues when logging failed manual download actions
+- core: update guessit to 2.1.4
+- core: fix issue causing the background task scheduler to stop after changing preferences
+- core: fix polish encoding (try windows-1250 first, then iso 8859-2)
+- core: remove subscenter provider as it now uses captchas
+- core: add titlovi as default provider (thanks viking!)
+- core: increase default PMS API request timeout to 15 (old: 10, max: 45); add preference for that
+- core: re-add separate legacy FindMissingSubtitles task and run it on the first run to prime SZ's internal subtitle storage
+- core: add "low impact mode" for people with remote filesystems (currently enabled for List LANGUAGE subtitles in detail menu); alleviates certain plexweb timeout issues
+- menu: change naming of find missing subtitles menu item
+- legendastv: fix multi value guessit issues
+- submod: OCR: update eng and hrv OCR replace dictionaries; fix ". L am huge"
+
+
+2.0.25.1635
+- core: update memory handling, possibly reduce memory problems of 2.0
+- core: support for MPL2 subtitle format
+- core: update task handling
+- core: re-enable NVIDIA SHIELD support by fixing rarfile behaviour
+- core: add SZ_UNRAR_TOOL environment variable for custom unrar location
+- core: disable SZ when no providers are enabled
+- core: only start activity monitor if channel or agent are enabled
+- core: improve custom provider integration
+- core: update eastern european encoding detection (especially Romanian)
+- tasks: reduce provider stress by introducing wait times between searches/downloads
+- windows: correctly ship UnRAR.exe
+- windows: skip DBM checks
+- addic7ed: fix Nip/Tuck
+- subscenter: use new domain
+
+
+2.0.24.1581
+- legendastv: ship unrar.exe for Windows users (fixes unrar issues)
+- addic7ed: fix TooManyRequests error
+- submod: OCR fixes NL: add custom dictionary data for malformed characters
+- submod: OCR fixes: update hrv/NL dictionaries
+- submod: common: remove spaces before punctuation
+- podnapisi: now returns more subtitles again
+ATTENTION: Sub-Zero is still broken on PMS for SHIELD. Help needed!
+
+
+2.0.24.1565
+- core: fix searchallrecentlymissing task erroring if item not found
+- core: fix non-plex-items appearing in and crashing the recently played list
+- core: add hybrid-plus activity setting (current media file and next episode)
+- podnapisi: fix by using correct guessit parameters
+
+
+2.0.24.1558
+- core: fix handling of broken RAR files from legendas
+
+
+2.0.24.1555
+- core: fix rare microdvd issue from OpenSubtitles by generally providing FPS info when encountering a microdvd subtitle
+
+
+2.0.24.1549
+Changes from 1.4
+- wiki: new wiki! (thanks @dane22!)
+- core: update subliminal to version 2
+- core: update all dependencies
+- core: add new providers: legendastv (pt-BR), napiprojekt (pl), shooter (cn), subscenter (heb)
+- core: rewritten all subliminal patches for version 2
+- core: use SSL again for opensubtitles
+- core: improved matching due to subliminal 2 (and SZ custom) tvdb/omdb refiners
+- core: improved matching by relying on existing metadata provided by the PMS
+- core: improved performance due to multithreaded provider-querying
+- core: improved performance due to less physical media file access (no more MKV metadata scanning)
+- core: VTT subtitle format output supported (for Chromecast)
+- core: rewrote and streamlined internal subtitle data storage format
+- core: support Cyrillic and Latin variants of Serbian language
+- core: simplified (custom) provider registration; add own provider registry
+- core: rewrote recently added missing task
+- core: automatically fix badly (re-) encoded unicode entities in subtitles
+- core: always store subtitles in proper UTF-8 encoding
+- core: add periodic internal subtitle data storage cleanup task
+- core: on non-windows systems, utilize a file-based cache database for provider media lists and subliminal refiner results
+- core: add manual and automatic subtitle modification framework (fix common OCR issues, remove hearing impaired etc.)
+- core: relieve some stress on providers by providing better fine-grained retry handling
+- menu: add icons for menu items; update main channel icon
+- menu: add subtitle modifications (subtitle content fixes, offset-based shifting, framerate conversion)
+- menu: add recently played menu
+- menu: add "Get my logs" function to the advanced menu, which zips up all necessary logs suitable for posting in the forums
+- menu: add generic "back to season" and "back to series" entries to item detail views to make navigation easier
+- config: all scores changed (defaults updated)
+- config: remove "Force UTF-8 when storing subtitles" (it's now always implied)
+- improve almost everything Sub-Zero did in 1.4 :)
+
+
 2.0.23.1464 RC10.1
  - core: huge bugfix; please check `Library/Application Support/Plex Media\ Server/Plug-in Support/Data/com.plexapp.agents.subzero/DataItems`
          for any `subs_XXXXX.json.gz` file bigger than 500kb and delete them

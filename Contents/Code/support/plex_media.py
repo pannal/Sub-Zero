@@ -1,13 +1,12 @@
 # coding=utf-8
 
 import os
-from urllib2 import URLError
 
 import helpers
-from config import config
 from items import get_item
-from lib import get_intent, Plex
-from subzero.video import parse_video
+from lib import Plex
+from support.config import TEXT_SUBTITLE_EXTS, config
+
 
 def get_metadata_dict(item, part, add):
     data = {
@@ -45,10 +44,11 @@ def get_plexapi_stream_info(plex_item, part_id=None):
         return d
 
     data["video_codec"] = current_media.video_codec
-    data["audio_codec"] = current_media.audio_codec.upper()
+    if current_media.audio_codec:
+        data["audio_codec"] = current_media.audio_codec.upper()
 
-    if data["audio_codec"] == "DCA":
-        data["audio_codec"] = "DTS"
+        if data["audio_codec"] == "DCA":
+            data["audio_codec"] = "DTS"
 
     if current_media.audio_channels == 8:
         data["audio_channels"] = "7.1"
@@ -153,10 +153,9 @@ def get_stream_fps(streams):
 
 
 def get_media_item_ids(media, kind="series"):
-    ids = []
-    if kind == "movies":
-        ids.append(media.id)
-    else:
+    # fixme: does this work correctly for full series force-refreshes and its intents?
+    ids = [media.id]
+    if kind == "series":
         for season in media.seasons:
             for episode in media.seasons[season].episodes:
                 ids.append(media.seasons[season].episodes[episode].id)
@@ -164,98 +163,53 @@ def get_media_item_ids(media, kind="series"):
     return ids
 
 
-def scan_video(pms_video_info, ignore_all=False, hints=None, rating_key=None, no_refining=False):
-    """
-    returnes a subliminal/guessit-refined parsed video
-    :param pms_video_info: 
-    :param ignore_all: 
-    :param hints: 
-    :param rating_key: 
-    :return: 
-    """
-    embedded_subtitles = not ignore_all and Prefs['subtitles.scan.embedded']
-    external_subtitles = not ignore_all and Prefs['subtitles.scan.external']
-
-    plex_part = pms_video_info["plex_part"]
-
-    if ignore_all:
-        Log.Debug("Force refresh intended.")
-
-    Log.Debug("Scanning video: %s, external_subtitles=%s, embedded_subtitles=%s" % (
-        plex_part.file, external_subtitles, embedded_subtitles))
-
-    known_embedded = []
+def get_all_parts(plex_item):
     parts = []
-    for media in list(Plex["library"].metadata(rating_key))[0].media:
+    for media in plex_item.media:
         parts += media.parts
 
-    plexpy_part = None
-    for part in parts:
-        if int(part.id) == int(plex_part.id):
-            plexpy_part = part
-
-    # embedded subtitles
-    if plexpy_part:
-        for stream in plexpy_part.streams:
-            # subtitle stream
-            if stream.stream_type == 3:
-                if (config.forced_only and getattr(stream, "forced")) or \
-                        (not config.forced_only and not getattr(stream, "forced")):
-
-                    # embedded subtitle
-                    if not stream.stream_key:
-                        if config.exotic_ext or stream.codec in ("srt", "ass", "ssa"):
-                            lang_code = stream.language_code
-
-                            # treat unknown language as lang1?
-                            if not lang_code and config.treat_und_as_first:
-                                lang_code = list(config.lang_list)[0].alpha3
-                            known_embedded.append(lang_code)
-    else:
-        Log.Warn("Part %s missing of %s, not able to scan internal streams", plex_part.id, rating_key)
-
-    try:
-        # get basic video info scan (filename)
-        video = parse_video(plex_part.file, pms_video_info, hints, external_subtitles=external_subtitles,
-                            embedded_subtitles=embedded_subtitles, known_embedded=known_embedded,
-                            forced_only=config.forced_only, no_refining=no_refining)
-
-        # add video fps info
-        video.fps = plex_part.fps
-        return video
-
-    except ValueError:
-        Log.Warn("File could not be guessed by subliminal: %s" % plex_part.file)
+    return parts
 
 
-def scan_videos(videos, kind="series", ignore_all=False, no_refining=False):
-    """
-    receives a list of videos containing dictionaries returned by media_to_videos
-    :param videos:
-    :param kind: series or movies
-    :return: dictionary of subliminal.video.scan_video, key=subliminal scanned video, value=plex file part
-    """
-    ret = {}
-    for video in videos:
-        intent = get_intent()
-        force_refresh = intent.get("force", video["id"], video["series_id"], video["season_id"])
-        Log.Debug("Determining force-refresh (video: %s, series: %s, season: %s), result: %s"
-                  % (video["id"], video["series_id"], video["season_id"], force_refresh))
+def get_embedded_subtitle_streams(part, requested_language=None, skip_duplicate_unknown=True, get_forced=None):
+    streams = []
+    has_unknown = False
+    for stream in part.streams:
+        # subtitle stream
+        if stream.stream_type == 3 and not stream.stream_key and stream.codec in TEXT_SUBTITLE_EXTS:
+            language = helpers.get_language_from_stream(stream.language_code)
+            is_unknown = False
+            found_requested_language = requested_language and requested_language == language
+            is_forced = helpers.is_stream_forced(stream)
 
-        hints = helpers.get_item_hints(video)
-        video["plex_part"].fps = get_stream_fps(video["plex_part"].streams)
-        scanned_video = scan_video(video, ignore_all=force_refresh or ignore_all, hints=hints,
-                                   rating_key=video["id"], no_refining=no_refining)
+            if get_forced is not None:
+                if (get_forced and not is_forced) or (not get_forced and is_forced):
+                    continue
 
-        if not scanned_video:
-            continue
+            if not language and config.treat_und_as_first:
+                # only consider first unknown subtitle stream
+                if has_unknown and skip_duplicate_unknown:
+                    continue
 
-        scanned_video.id = video["id"]
-        part_metadata = video.copy()
-        del part_metadata["plex_part"]
-        scanned_video.plexapi_metadata = part_metadata
-        ret[scanned_video] = video["plex_part"]
-    return ret
+                language = list(config.lang_list)[0]
+                is_unknown = True
+                has_unknown = True
+
+            if not requested_language or found_requested_language or has_unknown:
+                streams.append({"stream": stream, "is_unknown": is_unknown, "language": language,
+                                "is_forced": is_forced})
+
+                if found_requested_language:
+                    break
+
+    return streams
+
+
+def get_part(plex_item, part_id):
+    for media in plex_item.media:
+        for part in media.parts:
+            if str(part.id) == str(part_id):
+                return part
 
 
 def get_plex_metadata(rating_key, part_id, item_type, plex_item=None):
@@ -275,11 +229,7 @@ def get_plex_metadata(rating_key, part_id, item_type, plex_item=None):
         return
 
     # find current part
-    current_part = None
-    for media in plex_item.media:
-        for part in media.parts:
-            if str(part.id) == str(part_id):
-                current_part = part
+    current_part = get_part(plex_item, part_id)
 
     if not current_part:
         raise helpers.PartUnknownException("Part unknown")
@@ -332,6 +282,24 @@ def get_plex_metadata(rating_key, part_id, item_type, plex_item=None):
                                                            "section": plex_item.section.title})
                                      )
     return metadata
+
+
+def get_blacklist_from_part_map(video_part_map, languages):
+    from support.storage import get_subtitle_storage
+    subtitle_storage = get_subtitle_storage()
+    blacklist = []
+    for video, part in video_part_map.iteritems():
+        stored_subs = subtitle_storage.load_or_new(video.plexapi_metadata["item"])
+        for language in languages:
+            current_bl, subs = stored_subs.get_blacklist(part.id, language)
+            if not current_bl:
+                continue
+
+            blacklist = blacklist + [(str(a), str(b)) for a, b in current_bl.keys()]
+
+    subtitle_storage.destroy()
+
+    return blacklist
 
 
 class PMSMediaProxy(object):

@@ -8,6 +8,27 @@ from subliminal.score import get_scores
 logger = logging.getLogger(__name__)
 
 
+FPS_EQUALITY = (
+    (23.976, 23.98, 24.0),
+)
+
+
+def framerate_equal(source, check):
+    if source == check:
+        return True
+
+    source = float(source)
+    check = float(check)
+    if source == check:
+        return True
+
+    for equal_fps_tuple in FPS_EQUALITY:
+        if check in equal_fps_tuple and source in equal_fps_tuple:
+            return True
+
+    return False
+
+
 def compute_score(matches, subtitle, video, hearing_impaired=None):
     """Compute the score of the `subtitle` against the `video` with `hearing_impaired` preference.
     
@@ -59,6 +80,7 @@ def compute_score(matches, subtitle, video, hearing_impaired=None):
                     matches -= {"hash"}
     elif 'hash' in matches:
         logger.debug('%r: Hash not verifiable for this provider. Keeping it', subtitle)
+        matches &= {'hash'}
 
     # handle equivalent matches
     if is_episode:
@@ -73,7 +95,7 @@ def compute_score(matches, subtitle, video, hearing_impaired=None):
             matches |= {'series', 'year', 'season', 'episode'}
         if 'tvdb_id' in matches:
             logger.debug('Adding tvdb_id match equivalents')
-            matches |= {'series', 'year', 'season', 'episode'}
+            matches |= {'series', 'year', 'season', 'episode', 'title'}
         if 'series_tvdb_id' in matches:
             logger.debug('Adding series_tvdb_id match equivalents')
             matches |= {'series', 'year'}

@@ -16,9 +16,7 @@ class ShiftOffset(SubtitleModification):
     args_mergeable = True
     modifies_whole_file = True
 
-    long_description = """\
-    Adds or substracts a certain amount of time from the whole subtitle to match your media 
-    """
+    long_description = "Adds or substracts a certain amount of time from the whole subtitle to match your media"
 
     @classmethod
     def merge_args(cls, args1, args2):

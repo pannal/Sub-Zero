@@ -94,3 +94,70 @@ class DictProxy(object):
 
     def setup_defaults(self):
         raise NotImplementedError
+
+
+class Dicked(object):
+    """
+    mirrors a dictionary; readonly
+    """
+    _entries = None
+
+    def __init__(self, **entries):
+        self._entries = entries or None
+        for key, value in entries.iteritems():
+            self.__dict__[key] = (Dicked(**value) if isinstance(value, dict) else value)
+
+    def __repr__(self):
+        return str(self)
+
+    def __unicode__(self):
+        return unicode(self.__digged__)
+
+    def __str__(self):
+        return str(self.__digged__)
+
+    def __lt__(self, d):
+        return self._entries < d
+
+    def __le__(self, d):
+        return self._entries <= d
+
+    def __eq__(self, d):
+        if d is None and not self._entries:
+            return True
+
+        return self._entries == d
+
+    def __ne__(self, d):
+        return self._entries != d
+
+    def __gt__(self, d):
+        return self._entries > d
+
+    def __ge__(self, d):
+        return self._entries >= d
+
+    def __getattr__(self, name):
+        # fixme: this might be wildly stupid; maybe implement stuff like .iteritems() directly
+        return getattr(self._entries, name, Dicked())
+
+    @property
+    def __digged__(self):
+        return {key: value for key, value in self.__dict__.iteritems() if key != "_entries"}
+
+    def __len__(self):
+        return len(self.__digged__)
+
+    def __nonzero__(self):
+        return bool(self.__digged__)
+
+    def __iter__(self):
+        return iter(self.__digged__)
+
+    def __hash__(self):
+        return hash(self.__digged__)
+
+    def __getitem__(self, name):
+        if name in self._entries:
+            return getattr(self, name)
+        raise KeyError(name)

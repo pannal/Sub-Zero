@@ -34,18 +34,18 @@ class Color(SubtitleModification):
     description = "Change the color of the subtitle"
     exclusive = True
     advanced = True
+    modifies_whole_file = True
+    apply_last = True
 
     colors = COLOR_MAP
 
-    long_description = """\
-    Adds the requested color to every line of the subtitle. Support depends on player.
-    """
+    long_description = "Adds the requested color to every line of the subtitle. Support depends on player."
 
     def modify(self, content, debug=False, parent=None, **kwargs):
         color = self.colors.get(kwargs.get("name"))
         if color:
-            return u'<font color="%s">%s</font>' % (color, content)
-        return content
+            for entry in parent.f:
+                entry.text = u'<font color="%s">%s</font>' % (color, entry.text)
 
 
 registry.register(Color)

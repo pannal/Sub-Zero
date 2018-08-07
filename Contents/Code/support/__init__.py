@@ -13,6 +13,12 @@ import lib
 
 sys.modules["support.lib"] = lib
 
+import i18n
+
+sys.modules["support.i18n"] = i18n
+
+helpers._ = i18n._
+
 import plex_media
 sys.modules["support.plex_media"] = plex_media
 
@@ -28,21 +34,24 @@ import items
 
 sys.modules["support.items"] = items
 
-import missing_subtitles
-
-sys.modules["support.missing_subtitles"] = missing_subtitles
-
 import scheduler
 
 sys.modules["support.scheduler"] = scheduler
 
-import tasks
-
-sys.modules["support.tasks"] = tasks
-
 import storage
 
 sys.modules["support.storage"] = storage
+
+import scanning
+sys.modules["support.scanning"] = scanning
+
+import missing_subtitles
+
+sys.modules["support.missing_subtitles"] = missing_subtitles
+
+import tasks
+
+sys.modules["support.tasks"] = tasks
 
 import ignore
 

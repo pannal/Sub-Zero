@@ -5,12 +5,18 @@ import re
 import traceback
 import types
 import os
+
+import time
+
+import datetime
+
 from ignore import ignore_list
 from helpers import is_recent, get_plex_item_display_title, query_plex, PartUnknownException
 from lib import Plex, get_intent
 from config import config, IGNORE_FN
 from subliminal_patch.subtitle import ModifiedSubtitle
 from subzero.modification import registry as mod_registry, SubtitleModifications
+from socket import timeout
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +31,11 @@ def get_item(key):
     except ValueError:
         return
 
-    item_container = Plex["library"].metadata(item_id)
+    try:
+        item_container = Plex["library"].metadata(item_id)
+    except timeout:
+        Log.Debug("PMS API timed out when querying information about item %d", item_id)
+        return
 
     try:
         return list(item_container)[0]
@@ -52,6 +62,21 @@ def get_item_kind_from_rating_key(key):
 
 def get_item_kind_from_item(item):
     return PLEX_API_TYPE_MAP.get(get_item_kind(item))
+
+
+def get_item_title(item):
+    kind = get_item_kind_from_item(item)
+    if kind not in ("episode", "movie", "season", "series"):
+        return
+
+    if kind == "episode":
+        return get_plex_item_display_title(item, "show", parent=item.season, section_title=None,
+                                                 parent_title=item.show.title)
+    elif kind == "season":
+        return get_plex_item_display_title(item, "season", parent=item.show, section_title="Season",
+                                           parent_title=item.show.title)
+    else:
+        return get_plex_item_display_title(item, kind, section_title=None)
 
 
 def get_item_thumb(item):
@@ -240,7 +265,7 @@ def is_ignored(rating_key, item=None):
     :return:
     """
     # item in soft ignore list
-    if rating_key in ignore_list["videos"]:
+    if ignore_list["videos"] and rating_key in ignore_list["videos"]:
         Log.Debug("Item %s is in the soft ignore list" % rating_key)
         return True
 
@@ -248,12 +273,17 @@ def is_ignored(rating_key, item=None):
     kind = get_item_kind(item)
 
     # show in soft ignore list
-    if kind == "Episode" and item.show.rating_key in ignore_list["series"]:
+    if kind == "Episode" and ignore_list["series"] and item.show.rating_key in ignore_list["series"]:
         Log.Debug("Item %s's show is in the soft ignore list" % rating_key)
         return True
 
+    # season in soft ignore list
+    if kind == "Episode" and ignore_list["seasons"] and item.season.rating_key in ignore_list["seasons"]:
+        Log.Debug("Item %s's season is in the soft ignore list" % rating_key)
+        return True
+
     # section in soft ignore list
-    if item.section.key in ignore_list["sections"]:
+    if ignore_list["sections"] and item.section.key in ignore_list["sections"]:
         Log.Debug("Item %s's section is in the soft ignore list" % rating_key)
         return True
 
@@ -303,26 +333,101 @@ def refresh_item(rating_key, force=False, timeout=8000, refresh_kind=None, paren
         # season refresh, needs explicit per-episode refresh
         refresh = [item.rating_key for item in list(Plex["library/metadata"].children(int(rating_key)))]
 
+    multiple = len(refresh) > 1
     for key in refresh:
         Log.Info("%s item %s", "Refreshing" if not force else "Forced-refreshing", key)
         Plex["library/metadata"].refresh(key)
+        if multiple:
+            Thread.Sleep(10.0)
 
 
-def get_current_sub(rating_key, part_id, language):
+def get_current_sub(rating_key, part_id, language, plex_item=None):
     from support.storage import get_subtitle_storage
 
-    item = get_item(rating_key)
+    item = plex_item or get_item(rating_key)
     subtitle_storage = get_subtitle_storage()
     stored_subs = subtitle_storage.load_or_new(item)
     current_sub = stored_subs.get_any(part_id, language)
     return current_sub, stored_subs, subtitle_storage
 
 
-def set_mods_for_part(rating_key, part_id, language, item_type, mods, mode="add"):
-    from support.plex_media import get_plex_metadata, scan_videos
-    from support.storage import save_subtitles
+def save_stored_sub(stored_subtitle, rating_key, part_id, language, item_type, plex_item=None, storage=None,
+                    stored_subs=None):
+    """
+    in order for this to work, if the calling supplies stored_subs and storage, it has to trigger its saving and
+    destruction explicitly
+    :param stored_subtitle:
+    :param rating_key:
+    :param part_id:
+    :param language:
+    :param item_type:
+    :param plex_item:
+    :param storage:
+    :param stored_subs:
+    :return:
+    """
+    from support.plex_media import get_plex_metadata
+    from support.scanning import scan_videos
+    from support.storage import save_subtitles, get_subtitle_storage
 
-    current_sub, stored_subs, storage = get_current_sub(rating_key, part_id, language)
+    plex_item = plex_item or get_item(rating_key)
+
+    stored_subs_was_provided = True
+    if not stored_subs or not storage:
+        storage = get_subtitle_storage()
+        stored_subs = storage.load(plex_item.rating_key)
+        stored_subs_was_provided = False
+
+    if not all([plex_item, stored_subs]):
+        return
+
+    try:
+        metadata = get_plex_metadata(rating_key, part_id, item_type, plex_item=plex_item)
+    except PartUnknownException:
+        return
+
+    scanned_parts = scan_videos([metadata], ignore_all=True, skip_hashing=True)
+    video, plex_part = scanned_parts.items()[0]
+
+    subtitle = ModifiedSubtitle(language, mods=stored_subtitle.mods)
+    subtitle.content = stored_subtitle.content
+    if stored_subtitle.encoding:
+        # thanks plex
+        setattr(subtitle, "_guessed_encoding", stored_subtitle.encoding)
+
+        if stored_subtitle.encoding != "utf-8":
+            subtitle.normalize()
+            stored_subtitle.content = subtitle.content
+            stored_subtitle.encoding = "utf-8"
+            storage.save(stored_subs)
+
+    subtitle.plex_media_fps = plex_part.fps
+    subtitle.page_link = stored_subtitle.id
+    subtitle.language = language
+    subtitle.id = stored_subtitle.id
+
+    try:
+        save_subtitles(scanned_parts, {video: [subtitle]}, mode="m", bare_save=True)
+        Log.Debug("Modified %s subtitle for: %s:%s with: %s", language.name, rating_key, part_id,
+                  ", ".join(stored_subtitle.mods) if stored_subtitle.mods else "none")
+    except:
+        Log.Error("Something went wrong when modifying subtitle: %s", traceback.format_exc())
+
+    if subtitle.storage_path:
+        stored_subtitle.last_mod = datetime.datetime.fromtimestamp(os.path.getmtime(subtitle.storage_path))
+
+    if not stored_subs_was_provided:
+        storage.save(stored_subs)
+        storage.destroy()
+
+
+def set_mods_for_part(rating_key, part_id, language, item_type, mods, mode="add"):
+    plex_item = get_item(rating_key)
+
+    if not plex_item:
+        return
+
+    current_sub, stored_subs, storage = get_current_sub(rating_key, part_id, language, plex_item=plex_item)
     if mode == "add":
         for mod in mods:
             identifier, args = SubtitleModifications.parse_identifier(mod)
@@ -350,37 +455,9 @@ def set_mods_for_part(rating_key, part_id, language, item_type, mods, mode="add"
             current_sub.mods.pop()
     else:
         raise NotImplementedError("Wrong mode given")
+
+    save_stored_sub(current_sub, rating_key, part_id, language, item_type, plex_item=plex_item, storage=storage,
+                    stored_subs=stored_subs)
+
     storage.save(stored_subs)
-
-    try:
-        metadata = get_plex_metadata(rating_key, part_id, item_type)
-    except PartUnknownException:
-        return
-
-    scanned_parts = scan_videos([metadata], kind="series" if item_type == "episode" else "movie", ignore_all=True,
-                                no_refining=True)
-    video, plex_part = scanned_parts.items()[0]
-
-    subtitle = ModifiedSubtitle(language, mods=current_sub.mods)
-    subtitle.content = current_sub.content
-    if current_sub.encoding:
-        # thanks plex
-        setattr(subtitle, "_guessed_encoding", current_sub.encoding)
-
-        if current_sub.encoding != "utf-8":
-            subtitle.set_encoding("utf-8")
-            current_sub.content = subtitle.content
-            current_sub.encoding = "utf-8"
-            storage.save(stored_subs)
-
-    subtitle.plex_media_fps = plex_part.fps
-    subtitle.page_link = "modify subtitles with: %s" % (", ".join(current_sub.mods) if current_sub.mods else "none")
-    subtitle.language = language
-    subtitle.id = current_sub.id
-
-    try:
-        save_subtitles(scanned_parts, {video: [subtitle]}, mode="m", bare_save=True)
-        Log.Debug("Modified %s subtitle for: %s:%s with: %s", language.name, rating_key, part_id,
-                  ", ".join(current_sub.mods) if current_sub.mods else "none")
-    except:
-        Log.Error("Something went wrong when modifying subtitle: %s", traceback.format_exc())
+    storage.destroy()

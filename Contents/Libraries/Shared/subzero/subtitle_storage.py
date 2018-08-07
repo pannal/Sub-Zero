@@ -1,59 +1,21 @@
 # coding=utf-8
 import datetime
+import gzip
 import hashlib
 import os
 import logging
 import traceback
-import gzip
+import types
+import zlib
 
-from babelfish import Language
+import sys
 
-from json_tricks.nonp import loads, dumps
-
-
+from json_tricks.nonp import loads
+from subzero.lib.json import dumps
+from scandir import scandir
 from constants import mode_map
-from subliminal_patch.subtitle import ModifiedSubtitle
 
 logger = logging.getLogger(__name__)
-
-
-class StoredSubtitle(object):
-    """
-    legacy class used for PMS LoadObject/SaveObject
-    """
-    score = None
-    storage_type = None
-    hash = None
-    provider_name = None
-    id = None
-    date_added = None
-    mode = "a"  # auto/manual/auto-better (a/m/b)
-    content = None
-    mods = None
-
-    def __init__(self, score, storage_type, hash, provider_name, id, date_added=None, mode="a", content=None,
-                 mods=None):
-        self.score = int(score)
-        self.storage_type = storage_type
-        self.hash = hash
-        self.provider_name = provider_name
-        self.id = id
-        self.date_added = date_added or datetime.datetime.now()
-        self.mode = mode
-        self.content = content
-        self.mods = mods or []
-
-    def add_mod(self, identifier):
-        self.mods = self.mods or []
-        if identifier is None:
-            self.mods = []
-            return
-
-        self.mods.append(identifier)
-
-    @property
-    def mode_verbose(self):
-        return mode_map.get(self.mode, "Unknown")
 
 
 class JSONStoredSubtitle(object):
@@ -67,9 +29,10 @@ class JSONStoredSubtitle(object):
     content = None
     mods = None
     encoding = None
+    last_mod = None  # file modification
 
     def initialize(self, score, storage_type, hash, provider_name, id, date_added=None, mode="a", content=None,
-                 mods=None, encoding=None):
+                 mods=None, encoding=None, last_mod=None):
         self.score = int(score)
         self.storage_type = storage_type
         self.hash = hash
@@ -80,6 +43,7 @@ class JSONStoredSubtitle(object):
         self.content = content
         self.mods = mods or []
         self.encoding = encoding
+        self.last_mod = last_mod
 
     def add_mod(self, identifier):
         self.mods = self.mods or []
@@ -89,95 +53,28 @@ class JSONStoredSubtitle(object):
 
         self.mods.append(identifier)
 
+    @classmethod
+    def get_mode_verbose(cls, mode):
+        return mode_map.get(mode, "Unknown")
+
     @property
     def mode_verbose(self):
-        return mode_map.get(self.mode, "Unknown")
+        return self.get_mode_verbose(self.mode)
 
     def serialize(self):
-        if self.content:
-            # content is always stored in unicode (gets converted to string with escaped unicode chars by json)
-            try:
-                self.content = self.content.decode(self.encoding)
-            except UnicodeDecodeError:
-                try:
-                    self.content = self.content.decode("utf-8")
-                except UnicodeDecodeError:
-                    logger.error("Couldn't decode %s:%s (%s), ditching it", self.provider_name, self.id, self.encoding)
-                    return
         return self.__dict__
 
     def deserialize(self, data):
         if data["content"]:
-            # content is always present in encoded form
-            data["content"] = data["content"].encode(data["encoding"])
+            # legacy: storage was unicode; content is always present in encoded form
+            if isinstance(data["content"], types.UnicodeType):
+                data["content"] = data["content"].encode(data["encoding"])
+
         self.initialize(**data)
 
-
-class StoredVideoSubtitles(object):
-    """
-    legacy class
-    manages stored subtitles for video_id per media_part/language combination
-    """
-    video_id = None  # rating_key
-    title = None
-    parts = None
-    version = None
-    item_type = None  # movie / episode
-    added_at = None
-
-    def __init__(self, plex_item, version=None):
-        self.video_id = str(plex_item.rating_key)
-
-        self.title = plex_item.title
-        self.parts = {}
-        self.version = version
-        self.item_type = plex_item.type
-        self.added_at = datetime.datetime.fromtimestamp(plex_item.added_at)
-
-    def add(self, part_id, lang, subtitle, storage_type, date_added=None, mode="a"):
-        part_id = str(part_id)
-        part = self.parts.get(part_id)
-        if not part:
-            self.parts[part_id] = {}
-            part = self.parts[part_id]
-
-        subs = part.get(lang)
-        if not subs:
-            part[lang] = {}
-            subs = part[lang]
-
-        sub_key = self.get_sub_key(subtitle.provider_name, subtitle.id)
-        subs[sub_key] = StoredSubtitle(subtitle.score, storage_type, hashlib.md5(subtitle.content).hexdigest(),
-                                       subtitle.provider_name, subtitle.id, date_added=date_added, mode=mode,
-                                       content=subtitle.content, mods=subtitle.mods)
-        subs["current"] = sub_key
-
-        return True
-
-    def get_any(self, part_id, lang):
-        part_id = str(part_id)
-        part = self.parts.get(part_id)
-        if not part:
-            return
-
-        subs = part.get(lang)
-        if not subs:
-            return
-
-        if "current" in subs and subs["current"]:
-            return subs.get(subs["current"])
-
-    def get_sub_key(self, provider_name, id):
-        return provider_name, str(id)
-
-    def __repr__(self):
-        return unicode(self)
-
-    def __unicode__(self):
-        return u"%s (%s)" % (self.title, self.video_id)
-
-    def __str__(self):
-        return str(self.video_id)
+    @property
+    def key(self):
+        return self.provider_name, self.id
 
 
 class JSONStoredVideoSubtitles(object):
@@ -216,23 +113,11 @@ class JSONStoredVideoSubtitles(object):
                             if not isinstance(subtitle_data, tuple):
                                 subtitle_data = tuple(subtitle_data.split("__"))
                             self.parts[part_id][language]["current"] = subtitle_data
+                        elif sub_key == "blacklist":
+                            bl = dict((tuple([str(a) for a in k.split("__")]), v) for k, v in subtitle_data.iteritems())
+                            self.parts[part_id][language]["blacklist"] = bl
                         else:
                             sub = JSONStoredSubtitle()
-
-                            # legacy subtitle storage instance
-                            if isinstance(subtitle_data, StoredSubtitle):
-                                subtitle_data = subtitle_data.__dict__
-
-                                try:
-                                    lang = Language.fromietf(language)
-                                    subtitle = ModifiedSubtitle(lang)
-                                    subtitle.content = subtitle_data["content"]
-                                    subtitle.set_encoding("utf-8")
-                                    subtitle_data["content"] = subtitle.content
-                                    subtitle_data["encoding"] = "utf-8"
-                                except:
-                                    logger.error("Legacy subtitle data could not be converted to new storage format")
-                                    continue
 
                             sub.initialize(**subtitle_data)
                             if not isinstance(sub_key, tuple):
@@ -254,6 +139,9 @@ class JSONStoredVideoSubtitles(object):
                 for sub_key, stored_subtitle in sub_data.iteritems():
                     if sub_key == "current":
                         data["parts"][part_id][language]["current"] = "__".join(stored_subtitle)
+                    elif sub_key == "blacklist":
+                        data["parts"][part_id][language]["blacklist"] = dict(("__".join(k), v) for k, v in
+                                                                             stored_subtitle.iteritems())
                     else:
                         if stored_subtitle.content and not stored_subtitle.encoding:
                             continue
@@ -264,7 +152,7 @@ class JSONStoredVideoSubtitles(object):
 
         return data
 
-    def add(self, part_id, lang, subtitle, storage_type, date_added=None, mode="a"):
+    def add(self, part_id, lang, subtitle, storage_type, date_added=None, mode="a", last_mod=None, set_current=True):
         part_id = str(part_id)
         part = self.parts.get(part_id)
         if not part:
@@ -280,8 +168,12 @@ class JSONStoredVideoSubtitles(object):
         subs[sub_key] = JSONStoredSubtitle()
         subs[sub_key].initialize(subtitle.score, storage_type, hashlib.md5(subtitle.content).hexdigest(),
                                  subtitle.provider_name, subtitle.id, date_added=date_added, mode=mode,
-                                 content=subtitle.content, mods=subtitle.mods, encoding="utf-8")
-        subs["current"] = sub_key
+                                 content=subtitle.content, mods=subtitle.mods, encoding="utf-8",
+                                 last_mod=last_mod)
+
+        if set_current:
+            logger.debug(u"Setting subtitle as current: %r", subtitle)
+            subs["current"] = sub_key
 
         return True
 
@@ -298,8 +190,77 @@ class JSONStoredVideoSubtitles(object):
         if "current" in subs and subs["current"]:
             return subs.get(subs["current"])
 
+    def get(self, part_id, lang, sub_key):
+        subs = self.get_all(part_id, lang)
+        if not subs:
+            return
+
+        return subs.get(sub_key)
+
+    def get_all(self, part_id, lang):
+        part_id = str(part_id)
+        part = self.parts.get(part_id)
+        if not part:
+            return
+
+        return part.get(str(lang))
+
+    def get_by_provider(self, part_id, lang, provider_name):
+        out = []
+        all_subs = self.get_all(part_id, lang)
+        if not all_subs:
+            return out
+
+        for key, subtitle in all_subs.iteritems():
+            if key in ("current", "blacklist"):
+                continue
+
+            if subtitle.provider_name == provider_name:
+                out.append(subtitle)
+        return out
+
+    def count(self, part_id, lang):
+        part_id = str(part_id)
+        part = self.parts.get(part_id)
+        if not part:
+            return 0
+
+        subs = part.get(str(lang))
+        return len(filter(lambda key: key not in ("current", "blacklist"), subs.keys()))
+
     def get_sub_key(self, provider_name, id):
         return provider_name, str(id)
+
+    def get_blacklist(self, part_id, lang):
+        part_id = str(part_id)
+        part = self.parts.get(part_id)
+        if not part:
+            return {}, {}
+
+        subs = part.get(str(lang))
+        if not subs:
+            return {}, {}
+
+        current_bl = subs.get("blacklist", {})
+        return current_bl, subs
+
+    def blacklist(self, part_id, lang, sub_key, add=True):
+        current_bl, subs = self.get_blacklist(part_id, lang)
+        sub = subs.get(subs["current"])
+        if not sub:
+            return
+
+        if sub_key in current_bl:
+            if add:
+                return
+            else:
+                del current_bl[sub_key]
+                subs["blacklist"] = current_bl
+                return
+
+        current_bl[sub_key] = {"date_added": sub.date_added, "score": sub.score, "mode": sub.mode, "storage_type":
+            sub.storage_type}
+        subs["blacklist"] = current_bl
 
     def __repr__(self):
         return unicode(self)
@@ -316,12 +277,18 @@ class StoredSubtitlesManager(object):
     manages the storage and retrieval of StoredVideoSubtitles instances for a given video_id
     """
     storage = None
-    version = 2
+    version = 3
     extension = ".json.gz"
 
-    def __init__(self, storage, plexapi_item_getter):
+    def __init__(self, storage, threadkit, plexapi_item_getter):
         self.storage = storage
         self.get_item = plexapi_item_getter
+        self.threadkit = threadkit
+
+    def destroy(self):
+        self.storage = None
+        self.get_item = None
+        self.threadkit = None
 
     def get_storage_filename(self, video_id):
         return "subs_%s" % video_id
@@ -336,15 +303,19 @@ class StoredSubtitlesManager(object):
         return os.path.join(self.dataitems_path, bare_fn)
 
     def get_all_files(self):
-        return [fn for fn in os.listdir(self.dataitems_path) if fn.startswith("subs_")]
+        for entry in scandir(self.dataitems_path):
+            if entry.is_file(follow_symlinks=False) and \
+                    entry.name.startswith("subs_") and \
+                    entry.name.endswith(self.extension):
+                yield entry.name
 
     def get_recent_files(self, age_days=30):
         fl = []
         root = self.dataitems_path
         recent_dt = datetime.datetime.now() - datetime.timedelta(days=age_days)
         for fn in self.get_all_files():
-            finfo = os.stat(os.path.join(root, fn))
-            created = datetime.datetime.fromtimestamp(finfo.st_ctime)
+            ctime = os.path.getctime(os.path.join(root, fn))
+            created = datetime.datetime.fromtimestamp(ctime)
             if created > recent_dt:
                 fl.append(fn)
         return fl
@@ -362,7 +333,7 @@ class StoredSubtitlesManager(object):
         deleted = []
 
         def delete_fn(filename):
-            if filename.endswith(".json.gz"):
+            if filename.endswith(self.extension):
                 self.delete(self.get_json_data_path(filename))
             else:
                 self.legacy_delete(filename)
@@ -389,6 +360,10 @@ class StoredSubtitlesManager(object):
                     for part in media.parts:
                         known_parts.append(str(part.id))
                 stored_subs = self.load(filename=fn)
+
+                if not stored_subs:
+                    continue
+
                 missing_parts = set(stored_subs.parts).difference(set(known_parts))
 
                 changed_any = False
@@ -418,6 +393,9 @@ class StoredSubtitlesManager(object):
 
                 if changed_any:
                     self.save(stored_subs)
+                stored_subs = None
+                missing_parts = None
+                missing_languages = None
 
         return deleted
 
@@ -430,47 +408,43 @@ class StoredSubtitlesManager(object):
         subs_for_video.version = 2
         return True
 
-    def migrate_legacy_data(self, from_fn, to_fn):
-        try:
-            subs_for_video = self.storage.LoadObject(from_fn)
-        except:
-            logger.error("Failed to load item \"%s\": %s" % (from_fn, traceback.format_exc()))
-
-            # delete
-            return
-
-        if not subs_for_video or not hasattr(subs_for_video, "version"):
-            self.legacy_delete(from_fn)
-
-        # migrate to our new json format
-        new_subs_for_video = JSONStoredVideoSubtitles()
-        new_subs_for_video.deserialize(subs_for_video.__dict__)
-        self.save(new_subs_for_video)
-
-        self.legacy_delete(from_fn)
-
-        return new_subs_for_video
+    def migrate_v3(self, subs_for_video):
+        subs_for_video.version = 3
+        return True
 
     def load(self, video_id=None, filename=None):
         subs_for_video = None
         bare_fn = self.get_storage_filename(video_id) if video_id else filename
         json_path = self.get_json_data_path(bare_fn)
+        basename = os.path.basename(json_path)
+
+        #logger.debug("Loading subtitle storage data file: %s", basename)
+
         if os.path.exists(json_path):
             # new style data
             subs_for_video = JSONStoredVideoSubtitles()
             try:
-                with gzip.open(json_path, 'rb') as f:
-                    s = f.read()
+                with self.threadkit.Lock(key="sub_storage_%s" % basename):
+                    if sys.platform == "win32":
+                        try:
+                            with open(json_path, 'rb') as f:
+                                s = zlib.decompress(f.read())
+                        except zlib.error:
+                            # fallback to old gzip win32 implementation
+                            with gzip.open(json_path, 'rb', compresslevel=6) as f:
+                                s = f.read()
+
+                    else:
+                        with gzip.open(json_path, 'rb', compresslevel=6) as f:
+                            s = f.read()
 
                 data = loads(s)
             except:
-                logger.error("Couldn't load JSON data for %s", bare_fn)
+                logger.error("Couldn't load JSON data for %s: %s", bare_fn, traceback.format_exc())
                 return
 
             subs_for_video.deserialize(data)
-
-        elif not bare_fn.endswith(".json.gz") and os.path.exists(os.path.join(self.dataitems_path, bare_fn)):
-            subs_for_video = self.migrate_legacy_data(bare_fn, json_path)
+            data = None
 
         if not subs_for_video:
             return
@@ -499,30 +473,50 @@ class StoredSubtitlesManager(object):
 
         return subs_for_video
 
-    def load_or_new(self, plex_item):
+    def new(self, plex_item):
+        subs_for_video = JSONStoredVideoSubtitles()
+        subs_for_video.initialize(plex_item, version=self.version)
+        return subs_for_video
+
+    def load_or_new(self, plex_item, save=False):
         subs_for_video = self.load(plex_item.rating_key)
         if not subs_for_video:
-            subs_for_video = JSONStoredVideoSubtitles()
-            subs_for_video.initialize(plex_item, version=self.version)
-            self.save(subs_for_video)
+            logger.info("Creating new subtitle storage for: %s", plex_item.rating_key)
+            subs_for_video = self.new(plex_item)
+            if save:
+                self.save(subs_for_video)
         return subs_for_video
 
     def save(self, subs_for_video):
         data = subs_for_video.serialize()
+        temp_fn = self.get_json_data_path(self.get_storage_filename(subs_for_video.video_id) + "_tmp")
         fn = self.get_json_data_path(self.get_storage_filename(subs_for_video.video_id))
-        json_data = dumps(data)
-        with gzip.open(fn, "wb", compresslevel=6) as f:
-            f.write(json_data)
+        basename = os.path.basename(fn)
+        json_data = str(dumps(data, ensure_ascii=False))
+        with self.threadkit.Lock(key="sub_storage_%s" % basename):
+            if sys.platform == "win32":
+                try:
+                    f = open(temp_fn, "w+b")
+
+                    try:
+                        f.seek(0, os.SEEK_CUR)
+                        f.write(zlib.compress(json_data, 6))
+                        f.flush()
+                    except:
+                        logger.error("Something went wrong when writing to: %s: %s", basename, traceback.format_exc())
+                    finally:
+                        f.close()
+                except:
+                    logger.error("Something REALLY went wrong when writing to: %s: %s", basename,
+                                 traceback.format_exc())
+            else:
+                with gzip.open(temp_fn, "wb", compresslevel=6) as f:
+                    f.write(json_data)
+
+            os.rename(temp_fn, fn)
 
     def delete(self, filename):
         os.remove(filename)
-
-    def legacy_save(self, subs_for_video):
-        fn = self.get_storage_filename(subs_for_video.video_id)
-        try:
-            self.storage.SaveObject(fn, subs_for_video)
-        except:
-            logger.error("Failed to save item %s: %s" % (fn, traceback.format_exc()))
 
     def legacy_delete(self, filename):
         try:

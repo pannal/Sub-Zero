@@ -3,24 +3,25 @@ from wraptor.decorators import throttle
 from config import config
 from items import get_item, get_item_kind_from_item, refresh_item
 
-from plex_activity import Activity
-from plex_activity.sources.s_logging.main import Logging as Activity_Logging
+Activity = None
+try:
+    from plex_activity import Activity
+except ImportError:
+    pass
 
 
 class PlexActivityManager(object):
     def start(self):
         activity_sources_enabled = None
 
+        if not Activity:
+            return
+
         if config.plex_token:
             from plex import Plex
             Plex.configuration.defaults.authentication(config.plex_token)
             activity_sources_enabled = ["websocket"]
             Activity.on('websocket.playing', self.on_playing)
-
-        elif config.server_log_path:
-            Activity_Logging.add_hint(config.server_log_path, None)
-            activity_sources_enabled = ["logging"]
-            Activity.on('logging.playing', self.on_playing)
 
         if activity_sources_enabled:
             Activity.start(activity_sources_enabled)

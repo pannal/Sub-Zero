@@ -5,6 +5,7 @@ import logging
 import traceback
 
 import re
+import types
 
 import chardet
 import pysrt
@@ -14,7 +15,8 @@ from pysubs2 import SSAStyle
 from pysubs2.subrip import parse_tags, MAX_REPRESENTABLE_TIME
 from pysubs2.time import ms_to_times
 from subzero.modification import SubtitleModifications
-from subliminal import Subtitle
+from subliminal import Subtitle as Subtitle_
+from subliminal.subtitle import Episode, Movie, sanitize_release_group, sanitize, get_equivalent_release_groups
 from ftfy import fix_text
 
 logger = logging.getLogger(__name__)
@@ -26,7 +28,7 @@ ftfy_defaults = {
 }
 
 
-class PatchedSubtitle(Subtitle):
+class Subtitle(Subtitle_):
     storage_path = None
     release_info = None
     matches = None
@@ -36,12 +38,16 @@ class PatchedSubtitle(Subtitle):
     plex_media_fps = None
     skip_wrong_fps = False
     wrong_fps = False
+    is_pack = False
+    asked_for_release_group = None
+    asked_for_episode = None
 
+    pack_data = None
     _guessed_encoding = None
 
     def __init__(self, language, hearing_impaired=False, page_link=None, encoding=None, mods=None):
-        super(PatchedSubtitle, self).__init__(language, hearing_impaired=hearing_impaired, page_link=page_link,
-                                              encoding=encoding)
+        super(Subtitle, self).__init__(language, hearing_impaired=hearing_impaired, page_link=page_link,
+                                       encoding=encoding)
         self.mods = mods
 
     def __repr__(self):
@@ -63,6 +69,10 @@ class PatchedSubtitle(Subtitle):
 
         return self.content.decode(self.guess_encoding(), errors='replace')
 
+    @property
+    def numeric_id(self):
+        raise NotImplemented
+
     def make_picklable(self):
         """
         some subtitle instances might have unpicklable objects stored; clean them up here 
@@ -71,14 +81,24 @@ class PatchedSubtitle(Subtitle):
         return self
 
     def set_encoding(self, encoding):
-        logger.debug("Encoding change requested: to %s, from %s", encoding, self.guess_encoding())
-        if encoding == self.guess_encoding():
-            logger.debug("Encoding already is %s", encoding)
+        ge = self.guess_encoding()
+        if encoding == ge:
             return
 
         unicontent = self.text
+        logger.debug("Changing encoding: to %s, from %s", encoding, ge)
         self.content = unicontent.encode(encoding)
         self._guessed_encoding = encoding
+
+    def normalize(self):
+        """
+        Set encoding to UTF-8 and normalize line endings
+        :return:
+        """
+        self.set_encoding("utf-8")
+
+        # normalize line endings
+        self.content = self.content.replace("\r\n", "\n").replace('\r', '\n')
 
     def guess_encoding(self):
         """Guess encoding using the language, falling back on chardet.
@@ -88,7 +108,6 @@ class PatchedSubtitle(Subtitle):
 
         """
         if self._guessed_encoding:
-            logger.debug('Encoding already guessed: %s', self._guessed_encoding)
             return self._guessed_encoding
 
         logger.info('Guessing encoding for language %s', self.language)
@@ -120,16 +139,19 @@ class PatchedSubtitle(Subtitle):
                               'mac_greek'])
 
         # Polish, Czech, Slovak, Hungarian, Slovene, Bosnian, Croatian, Serbian (Latin script),
-        # Romanian (before 1993 spelling reform) and Albanian
+        # Romanian and Albanian
         elif self.language.alpha3 in ('pol', 'cze', 'ces', 'slk', 'slo', 'slv', 'hun', 'bos', 'hbs', 'hrv', 'rsb',
                                       'ron', 'rum', 'sqi', 'alb'):
+
+            encodings.extend(['windows-1250', 'iso-8859-2'])
+
             # Eastern European Group 1
             if self.language.alpha3 == "slv":
                 encodings.append('iso-8859-4')
 
-            elif self.language.alpha3 in ("ron", "rum", "sqi", "alb"):
-                encodings.extend(['windows-1252', 'iso-8859-1', 'iso-8859-9', 'iso-8859-15'])
-            encodings.extend(['windows-1250', 'iso-8859-2'])
+            # Albanian
+            elif self.language.alpha3 in ("sqi", "alb"):
+                encodings.extend(['windows-1252', 'iso-8859-15', 'iso-8859-1', 'iso-8859-9'])
 
         # Bulgarian, Serbian and Macedonian, Ukranian and Russian
         elif self.language.alpha3 in ('bul', 'srp', 'mkd', 'mac', 'rus', 'ukr'):
@@ -143,7 +165,7 @@ class PatchedSubtitle(Subtitle):
                 elif self.language.script == "Cyrl":
                     encodings.extend(['windows-1251', 'iso-8859-5'])
                 else:
-                    encodings.extend(['windows-1251', 'windows-1250', 'iso-8859-5', 'iso-8859-2'])
+                    encodings.extend(['windows-1250', 'windows-1251', 'iso-8859-2', 'iso-8859-5'])
 
         else:
             # Western European (windows-1252) / Northern European
@@ -210,6 +232,8 @@ class PatchedSubtitle(Subtitle):
                 subs = pysubs2.SSAFile.from_string(text)
                 if subs.format == "microdvd":
                     logger.info("Got FPS from MicroDVD subtitle: %s", subs.fps)
+                else:
+                    logger.info("Got format: %s", subs.format)
             except pysubs2.UnknownFPSError:
                 # if parsing failed, suggest our media file's fps
                 logger.info("No FPS info in subtitle. Using our own media FPS for the MicroDVD subtitle: %s",
@@ -285,14 +309,117 @@ class PatchedSubtitle(Subtitle):
         :return: string 
         """
         if not self.mods:
-            return fix_text(self.content.decode("utf-8"), **ftfy_defaults)
+            return fix_text(self.content.decode("utf-8"), **ftfy_defaults).encode(encoding="utf-8")
 
         submods = SubtitleModifications(debug=debug)
-        submods.load(content=self.text, language=self.language)
-        submods.modify(*self.mods)
+        if submods.load(content=self.text, language=self.language):
+            logger.info("Applying mods: %s", self.mods)
+            submods.modify(*self.mods)
 
-        return fix_text(self.pysubs2_to_unicode(submods.f, format=format), **ftfy_defaults).encode(encoding="utf-8")
+            content = fix_text(self.pysubs2_to_unicode(submods.f, format=format), **ftfy_defaults)\
+                .encode(encoding="utf-8")
+            submods.f = None
+            del submods
+            return content
+        return None
 
 
-class ModifiedSubtitle(PatchedSubtitle):
+class ModifiedSubtitle(Subtitle):
     id = None
+
+
+def guess_matches(video, guess, partial=False):
+    """Get matches between a `video` and a `guess`.
+
+    If a guess is `partial`, the absence information won't be counted as a match.
+
+    Patch: add multiple release group and formats handling
+
+    :param video: the video.
+    :type video: :class:`~subliminal.video.Video`
+    :param guess: the guess.
+    :type guess: dict
+    :param bool partial: whether or not the guess is partial.
+    :return: matches between the `video` and the `guess`.
+    :rtype: set
+
+    """
+
+    matches = set()
+    if isinstance(video, Episode):
+        # series
+        if video.series and 'title' in guess and sanitize(guess['title']) == sanitize(video.series):
+            matches.add('series')
+        # title
+        if video.title and 'episode_title' in guess and sanitize(guess['episode_title']) == sanitize(video.title):
+            matches.add('title')
+        # season
+        if video.season and 'season' in guess and guess['season'] == video.season:
+            matches.add('season')
+        # episode
+        # Currently we only have single-ep support (guessit returns a multi-ep as a list with int values)
+        # Most providers only support single-ep, so make sure it contains only 1 episode
+        # In case of multi-ep, take the lowest episode (subtitles will normally be available on lowest episode number)
+        if video.episode and 'episode' in guess:
+            episode_guess = guess['episode']
+            episode = min(episode_guess) if episode_guess and isinstance(episode_guess, list) else episode_guess
+            if episode == video.episode:
+                matches.add('episode')
+        # year
+        if video.year and 'year' in guess and guess['year'] == video.year:
+            matches.add('year')
+        # count "no year" as an information
+        if not partial and video.original_series and 'year' not in guess:
+            matches.add('year')
+    elif isinstance(video, Movie):
+        # year
+        if video.year and 'year' in guess and guess['year'] == video.year:
+            matches.add('year')
+        # title
+        if video.title and 'title' in guess and sanitize(guess['title']) == sanitize(video.title):
+            matches.add('title')
+
+    # release_group
+    if 'release_group' in guess:
+        release_groups = guess["release_group"]
+        if not isinstance(release_groups, types.ListType):
+            release_groups = [release_groups]
+
+        if video.release_group:
+            for release_group in release_groups:
+                if (sanitize_release_group(release_group) in
+                        get_equivalent_release_groups(sanitize_release_group(video.release_group))):
+                    matches.add('release_group')
+                    break
+
+    # resolution
+    if video.resolution and 'screen_size' in guess and guess['screen_size'] == video.resolution:
+        matches.add('resolution')
+
+    # format
+    if 'format' in guess:
+        formats = guess["format"]
+        if not isinstance(formats, types.ListType):
+            formats = [formats]
+
+        if video.format:
+            video_format = video.format
+            if video_format in ("HDTV", "SDTV", "TV"):
+                video_format = "TV"
+                logger.debug("Treating HDTV/SDTV the same")
+
+            for frmt in formats:
+                if frmt in ("HDTV", "SDTV"):
+                    frmt = "TV"
+
+                if frmt.lower() == video_format.lower():
+                    matches.add('format')
+                    break
+    # video_codec
+    if video.video_codec and 'video_codec' in guess and guess['video_codec'] == video.video_codec:
+        matches.add('video_codec')
+    # audio_codec
+    if video.audio_codec and 'audio_codec' in guess and guess['audio_codec'] == video.audio_codec:
+        matches.add('audio_codec')
+
+    return matches

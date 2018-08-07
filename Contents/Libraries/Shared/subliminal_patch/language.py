@@ -20,6 +20,10 @@ class PatchedOpenSubtitlesConverter(OpenSubtitlesConverter):
         self.to_opensubtitles.update({
             ('srp', None, "Latn"): 'scc',
             ('srp', None, "Cyrl"): 'scc',
+            ('chi', None, 'Hant'): 'zht'
+        })
+        self.from_opensubtitles.update({
+            'zht': ('zho', None, 'Hant')
         })
 
     def convert(self, alpha3, country=None, script=None):

@@ -1,6 +1,6 @@
 # coding=utf-8
 
-from babelfish import Language
+from subzero.language import Language
 from data import data
 
 #for lang, data in data.iteritems():
