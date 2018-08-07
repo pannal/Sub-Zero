@@ -23,7 +23,7 @@
         <key>PlexPluginConsoleLogging</key>
         <string>0</string>
         <key>PlexPluginDevMode</key>
-        <string>1</string>
+        <string>0</string>
          <key>PlexPluginCodePolicy</key>
             <!-- this allows channels to access some python methods which are otherwise blocked, as well as import external code libraries, and interact with the PMS HTTP API -->
             <string>Elevated</string>

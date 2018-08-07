@@ -88,8 +88,8 @@ Jacob K, Ninjouz, chopeta, fvb, Jose
 - core: notify executable: fix usage with python scripts (drops inherited PYTHONPATH), fixes #355
 - core: fix plugin_pin_mode
 - refiners: filebot: fix usage on OSX
-- providers: add assrt.net (Chinese)
-- providers: add supersubtitles (feliratok.info, Hungarian)
+- providers: add assrt.net (Chinese) - thanks @dimotsai!
+- providers: add supersubtitles (feliratok.info, Hungarian) - thanks @morpheus133!
 - providers: addic7ed: cache login data instead of re-login per search
 - submod: HI: support "&" and "+" in hi_before_colon
 - submod: HI: be less aggressive with HI_before_colon_noncaps; fixes #510
