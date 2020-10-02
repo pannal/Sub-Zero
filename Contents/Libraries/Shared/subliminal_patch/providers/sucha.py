@@ -59,7 +59,9 @@ class SuchaSubtitle(Subtitle):
                 self.found_matches.add("video_codec")
 
         if video.audio_codec:
-            if video.audio_codec.lower().replace(" ", ".") in self.release_info.lower():
+            if video.audio_codec == "AC3" and "dolby" in self.release_info.lower():
+                self.found_matches.add("audio_codec")
+            elif video.audio_codec.lower().replace(" ", ".") in self.release_info.lower():
                 self.found_matches.add("audio_codec")
         return self.found_matches
 
