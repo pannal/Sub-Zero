@@ -498,6 +498,12 @@
     "default": "false"
   },
   {
+    "id": "provider.sucha.enabled",
+    "label": "Provider: Enable Sucha (Spanish; UNRAR NEEDED)",
+    "type": "bool",
+    "default": "false"
+  },
+  {
     "id": "provider.argenteam.enabled",
     "label": "Provider: Enable aRGENTeaM (Spanish)",
     "type": "bool",
