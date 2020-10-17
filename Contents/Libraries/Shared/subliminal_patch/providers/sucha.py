@@ -6,10 +6,11 @@ import rarfile
 import zipfile
 
 from subliminal.exceptions import ProviderError
+from guessit import guessit
 from requests import Session
 from subliminal import Episode, Movie
 from subliminal_patch.providers import Provider
-from subliminal_patch.subtitle import Subtitle
+from subliminal_patch.subtitle import Subtitle, guess_matches
 from subzero.language import Language
 
 
@@ -24,12 +25,13 @@ class SuchaSubtitle(Subtitle):
     hash_verifiable = False
 
     def __init__(
-        self, language, page_link, filename, download_link, hearing_impaired, matches
+        self, language, page_link, filename, download_link, hearing_impaired, matches, episode
     ):
         super(SuchaSubtitle, self).__init__(
             language, hearing_impaired=hearing_impaired, page_link=page_url
         )
         self.download_link = download_link
+        self.is_episode = episode
         self.referer = page_link
         self.language = language
         self.release_info = filename
@@ -41,28 +43,14 @@ class SuchaSubtitle(Subtitle):
         return self.download_link
 
     def get_matches(self, video):
-        if video.resolution and video.resolution.lower() in self.release_info.lower():
-            self.found_matches.add("resolution")
-
-        if video.format:
-            if "web" in video.format.lower() and "web" in self.release_info.lower():
-                self.found_matches.add("format")
-            elif video.format.lower() in self.release_info.lower().replace("-", ""):
-                self.found_matches.add("format")
-
-        if video.video_codec:
-            if video.video_codec == "h264" and "x264" in self.release_info.lower():
-                self.found_matches.add("video_codec")
-            elif video.video_codec == "h265" and "x265" in self.release_info.lower():
-                self.found_matches.add("video_codec")
-            elif video.video_codec.lower() in self.release_info.lower():
-                self.found_matches.add("video_codec")
-
-        if video.audio_codec:
-            if video.audio_codec == "AC3" and "dolby" in self.release_info.lower():
-                self.found_matches.add("audio_codec")
-            elif video.audio_codec.lower().replace(" ", ".") in self.release_info.lower():
-                self.found_matches.add("audio_codec")
+        if self.is_episode:
+            self.found_matches |= guess_matches(
+                video, guessit(self.filename, {"type": "episode"})
+            )
+        else:
+            self.found_matches |= guess_matches(
+                video, guessit(self.filename, {"type": "movie"})
+            )
         return self.found_matches
 
 
@@ -126,14 +114,25 @@ class SuchaProvider(Provider):
                 if imdb_id:
                     matches.add("imdb_id")
                     matches.add("tvdb_id")
+
+                filename = i["pseudo_file"]
+                if (
+                    video.release_group
+                    and str(video.release_group).lower() in i["original_description"]
+                ):
+                    filename = i["pseudo_file"].replace(
+                        ".es.srt", "-" + str(video.release_group) + ".es.srt"
+                    )
+
                 subtitles.append(
                     SuchaSubtitle(
                         language,
                         i["referer"],
-                        i["pseudo_file"],
+                        filename,
                         i["download_url"],
                         i["hearing_impaired"],
                         matches,
+                        is_episode,
                     )
                 )
             return subtitles
