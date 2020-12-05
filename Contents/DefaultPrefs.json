@@ -521,6 +521,12 @@
     "type": "bool",
     "default": "true"
   },
+  {
+    "id": "provider.wizdom.enabled",
+    "label": "Provider: Enable WizdomSubs (Hebrew)",
+    "type": "bool",
+    "default": "true"
+  },
  {
     "id": "provider.ktuvit.enabled",
     "label": "Provider: Enable Ktuvit (Hebrew)",
@@ -537,6 +543,8 @@
     "id": "provider.ktuvit.password",
     "label": "Ktuvit Password",
     "type": "text",
+    "option": "hidden",
+    "secure": "true",
     "default": ""
   },
   {

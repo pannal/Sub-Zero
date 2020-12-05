@@ -806,6 +806,7 @@ class Config(object):
                      'assrt': cast_bool(Prefs['provider.assrt.enabled']),
                      'bsplayer': cast_bool(Prefs['provider.bsplayer.enabled']),
                      'ktuvit': cast_bool(Prefs['provider.ktuvit.enabled']),
+                     'wizdom': cast_bool(Prefs['provider.wizdom.enabled']),
                 }
 
     @property
@@ -837,6 +838,7 @@ class Config(object):
             providers["napisy24"] = False
             providers["bsplayer"] = False
             providers["ktuvit"] = False
+            providers["wizdom"] = False
             providers_forced_off = dict(providers)
 
         if not self.unrar and providers["legendastv"]:

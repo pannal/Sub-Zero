@@ -96,6 +96,7 @@ provider_manager = RegistrableExtensionManager('subliminal.providers', [
     'thesubdb = subliminal.providers.thesubdb:TheSubDBProvider',
     'tvsubtitles = subliminal.providers.tvsubtitles:TVsubtitlesProvider',
     'ktuvit = subliminal.providers.ktuvit:KtuvitProvider'
+    'wizdom = subliminal.providers.wizdom:WizdomProvider'
 ])
 
 #: Refiner manager
