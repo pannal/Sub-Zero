@@ -1,6 +1,8 @@
 # coding=utf-8
 
 import re
+import logging
+from collections import OrderedDict
 
 from subzero.language import Language
 from subzero.modification.mods import SubtitleTextModification, empty_line_post_processors, SubtitleModification
@@ -9,7 +11,7 @@ from subzero.modification.processors.re_processor import NReProcessor
 from subzero.modification import registry
 from tld import get_tld
 
-
+logger = logging.getLogger(__name__)
 ENGLISH = Language("eng")
 
 
@@ -181,7 +183,104 @@ class FixUppercase(SubtitleModification):
             entry.plaintext = self.capitalize(entry.plaintext)
 
 
+class FixIncremental(SubtitleModification):
+    identifier = "fix_incremental"
+    description = "Fixes inremental-repeating subtitles"
+    modifies_whole_file = True
+    exclusive = True
+
+    long_description = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+
+    def modify(self, content, debug=False, parent=None, **kwargs):
+        prev_entry = None
+        for entry in parent.f:
+            subs = []
+            for sub in entry.text.split("\N"):
+                if prev_entry and prev_entry.text and prev_entry.text.lower().endswith(sub.lower()):
+                    if debug:
+                        logger.debug(u"Skipping incremental/dup: %s" % sub)
+                    continue
+                subs.append(sub)
+
+            if subs:
+                entry.text = "\N".join(subs)
+
+            prev_entry = entry
+
+
+
+class FixShort(SubtitleModification):
+    identifier = "fix_short"
+    description = "ASDasdasdasdasdd"
+    modifies_whole_file = True
+    exclusive = True
+
+    long_description = "adsadsdasdsadsa"
+
+    def modify(self, content, debug=False, parent=None, **kwargs):
+        prev_entry = None
+        prev_entry_dur = None
+        max_duration = 500
+        max_line_len = 200
+        max_lines = 3
+        entries = []
+        last_lines = []
+        for index, entry in enumerate(parent.f):
+            current_new_lines = []
+            if not last_lines and parent.f[index-1]:
+                print "YOO"
+                # find last lines
+                last_lines = parent.f[index-1].text.split("\N")
+            has_space = len(last_lines) < max_lines
+            last_line = ""
+            # go through each line and pack them
+            for line in entry.text.split("\N"):
+                new_line = ""
+                if line:
+                    if last_line != line and last_line and len(last_line + line) <= max_line_len:
+                        # new line plus line fits
+                        if re.match(".+\W$", line):
+                            if last_line.endswith(" "):
+                                new_line = last_line + line
+                            else:
+                                new_line = last_line + " " + line
+                            logger.debug("MERGING '%s' with '%s' to '%s'", last_line, line, new_line)
+                    else:
+                        new_line = line
+                last_line = new_line
+                current_new_lines.append(new_line)
+
+            # merge entries
+            if prev_entry:
+                #print prev_entry.duration, max_duration, len(new_lines), max_lines
+                if prev_entry.duration < max_duration and len(current_new_lines) < max_lines:
+                    #len(prev_entry.text) < max_len
+                    print "HIT", prev_entry.text, " + ", entry.text
+                    entry_text = prev_entry.text + "\N" + "\N".join(current_new_lines)
+
+                else:
+                    entry_text = "\N".join(current_new_lines)
+            else:
+                entry_text = "\N".join(current_new_lines)
+
+            #prev_entry = entry.copy()
+            if not prev_entry:
+                prev_entry = entry.copy()
+                continue
+            new_entry = prev_entry.copy()
+            new_entry.text = entry_text
+            prev_entry = new_entry.copy()
+            entries.append(new_entry)
+            #new_entries.append(entry.copy())
+
+        parent.f.entries = entries
+
+
+
+
 registry.register(CommonFixes)
 registry.register(RemoveTags)
 registry.register(ReverseRTL)
 registry.register(FixUppercase)
+registry.register(FixIncremental)
+registry.register(FixShort)

@@ -21,7 +21,7 @@ if debug:
     logging.basicConfig(level=logging.DEBUG)
 
 #sub = Subtitle(Language.fromietf("eng:forced"), mods=["common", "remove_HI", "OCR_fixes", "fix_uppercase", "shift_offset(ms=-500)", "shift_offset(ms=500)", "shift_offset(s=2,ms=800)"])
-sub = Subtitle(Language.fromietf("eng"), mods=["common", "remove_HI", "OCR_fixes", "fix_uppercase", "shift_offset(ms=0,s=1)"])
+sub = Subtitle(Language.fromietf("eng"), mods=["common", "remove_HI", "OCR_fixes", "fix_uppercase", "shift_offset(ms=0,s=1)", "fix_incremental", "fix_short"])
 sub.content = open(fn).read()
 sub.normalize()
 sub.is_valid()
