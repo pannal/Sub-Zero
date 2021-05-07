@@ -23,7 +23,7 @@
         <key>PlexPluginConsoleLogging</key>
         <string>0</string>
         <key>PlexPluginDevMode</key>
-        <string>0</string>
+        <string>1</string>
          <key>PlexPluginCodePolicy</key>
             <!-- this allows channels to access some python methods which are otherwise blocked, as well as import external code libraries, and interact with the PMS HTTP API -->
             <string>Elevated</string>
@@ -32,7 +32,7 @@
 
 &lt;h1&gt;Sub-Zero for Plex&lt;/h1&gt;&lt;i&gt;Subtitles done right&lt;/i&gt;
 
-Version 2.6.5.3268
+Version 2.6.5.3268 DEV
 
 Originally based on @bramwalet's awesome &lt;a href=&quot;https://github.com/bramwalet/Subliminal.bundle&quot;&gt;Subliminal.bundle&lt;/a&gt;
 
