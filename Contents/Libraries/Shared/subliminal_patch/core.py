@@ -529,7 +529,7 @@ def scan_video(path, dont_use_actual_file=False, hints=None, providers=None, ski
     video.hints = hints
 
     # get possibly alternative title from the filename itself
-    alt_guess = guessit(filename, options=hints)
+    alt_guess = guessit(filename, options={k: v for k, v in hints.items() if k not in ('expected_title', 'title')})
     if "title" in alt_guess and alt_guess["title"] != guessed_result["title"]:
         if video_type == "episode":
             video.alternative_series.append(alt_guess["title"])
