@@ -671,12 +671,23 @@ class Config(object):
         enabled_for_primary_agents = {"movie": [], "show": []}
         enabled_sections = {}
 
+        legacy_agents = {
+            "com.plexapp.agents.thetvdb": [SHOW],
+            "com.plexapp.agents.thetvdbdvdorder": [SHOW],
+            "com.plexapp.agents.hama": [SHOW, MOVIE],
+            "com.plexapp.agents.themoviedb": [SHOW, MOVIE],
+            "com.plexapp.agents.imdb": [SHOW, MOVIE],
+        }
+
         # find which agents we're enabled for
         for agent in Plex.agents():
-            if not agent.primary:
+            #if not agent.primary:
+            #    continue
+            if agent.identifier not in legacy_agents:
                 continue
 
-            media_types = [t.media_type for t in list(agent.media_types)]
+            #media_types = [t.media_type for t in list(agent.media_types)]
+            media_types = legacy_agents[agent.identifier] + []
 
             # the new movie agent doesn't populate its media types, workaround
             if not media_types and agent.identifier == "tv.plex.agents.movie":
