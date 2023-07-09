@@ -1,7 +1,7 @@
 # Sub-Zero for Plex
 [![](https://img.shields.io/github/release/pannal/Sub-Zero.bundle.svg?style=flat&label=stable)](https://github.com/pannal/Sub-Zero.bundle/releases/latest) 
 [![master](https://img.shields.io/badge/master-stable-green.svg?maxAge=2592000)]()
-[![Maintenance](https://img.shields.io/maintenance/yes/2021.svg)]()
+[![Maintenance](https://img.shields.io/maintenance/yes/2023.svg)]()
 [![Slack Status](https://szslack.fragstore.net/badge.svg)](https://szslack.fragstore.net)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fpannal%2FSub-Zero.bundle.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fpannal%2FSub-Zero.bundle?ref=badge_shield)
 
@@ -11,6 +11,9 @@ Check out **[the Sub-Zero Wiki](https://github.com/pannal/Sub-Zero.bundle/wiki)*
 <br style="clear:left;"/>
 
 <br />
+
+## Legacy maintenance mode
+This addon will not be developed any further. It still works and arguably is still the best for managing subtitles when using Plex. As long as Plex Inc. supports agents, Sub-Zero will be maintained to work with the latest PMS version.
 
 ---
 
@@ -24,7 +27,7 @@ Check out **[the Sub-Zero Wiki](https://github.com/pannal/Sub-Zero.bundle/wiki)*
 
 ## Helping development
 
-If you like this, buy me a beer: <br>[![Donate](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=G9VKR2B8PMNKG) <br>or become a Patreon starting at **1 $ / month** <br><a href="https://www.patreon.com/subzero_plex" target="_blank"><img src="https://i0.wp.com/tablecakes.com/wp-content/uploads/2018/08/become-a-patron-button.png" height="54" /></a> <br>or use the OpenSubtitles Sub-Zero affiliate link to become VIP <br>**10€/year, ad-free subs, 1000 subs/day, no-cache *VIP* server**<br><a href="http://v.ht/osvip" target="_blank"><img src="https://static.opensubtitles.org/gfx/logo.gif" height="50" /></a> 
+If you like this, buy me a beer: <br>[![Donate](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=G9VKR2B8PMNKG) <br>or become a Patreon starting at **1 $ / month** <br><a href="https://www.patreon.com/subzero_plex" target="_blank"><img src="https://images.squarespace-cdn.com/content/v1/56c7831bf8baf3ae17ce9259/1561826418792-IJOMFASTOR6CW80N5W0Z/ke17ZwdGBToddI8pDm48kEycOuEejcFJqqLot0yQ4VVZw-zPPgdn4jUwVcJE1ZvWEtT5uBSRWt4vQZAgTJucoTqqXjS3CfNDSuuf31e0tVFrfGYmOrPFZFUXr1UxW4wA0PgPOjs31URy2JeWL9DdYhur-lC0WofN0YB1wFg-ZW0/footer-patreon.png?format=500w" height="54" /></a>
 
 If you register with an anti-captcha service and you decide to use [Anti-Captcha.com](http://getcaptchasolution.com/kkvviom7nh), you can use [this affiliate link](http://getcaptchasolution.com/kkvviom7nh) to help development.
 
@@ -92,6 +95,12 @@ Ever had broken music icons in a subtitle? Nordic characters like `Å` which tur
 the.vbm, mmgoodnow, Vertig0ne, thliu78, tattoomees, ostman, count_confucius, eherberg, tywilliams_88, Swanny, Jippo, Joost1991 / joost, Marik, Jon, AmbyDK, Clay, Abenlog, michael, smikwily, shoghicp, Zuikkis, Isilorn, Jacob K, Ninjouz, chopeta, fvb, Uthman, Claus Møller, Semi Doludizgin, Rafael, sugarman402, Morpheus1333, Yamil.llanos, Notorius28 
 
 ## Changelog
+
+2.6.5.3277
+- core: fix enabled library/agents detection (Plex removed certain features)
+  fix Plex agent integration; Plex Inc removed certain attributes; SZ is now limited to thetvdb, thetvdbdvdorder, hama, themoviedb, imdb)
+
+
 
 2.6.5.3268
 subscene, addic7ed

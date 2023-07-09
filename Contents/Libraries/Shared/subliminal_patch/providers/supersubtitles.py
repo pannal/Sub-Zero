@@ -143,7 +143,7 @@ class SuperSubtitlesProvider(Provider, ProviderSubtitleArchiveMixin):
     ]}
     video_types = (Episode, Movie)
     # https://www.feliratok.info/?search=&soriSorszam=&nyelv=&sorozatnev=The+Flash+%282014%29&sid=3212&complexsearch=true&knyelv=0&evad=4&epizod1=1&cimke=0&minoseg=0&rlsr=0&tab=all
-    server_url = 'https://www.feliratok.info/'
+    server_url = 'https://www.feliratok.eu/'
     subtitle_class = SuperSubtitlesSubtitle
     hearing_impaired_verifiable = False
     multi_result_throttle = 2  # seconds

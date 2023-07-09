@@ -181,6 +181,14 @@ class FixUppercase(SubtitleModification):
             entry.plaintext = self.capitalize(entry.plaintext)
 
 
+"""
+subsync
+
+subsync --cli --offline --overwrite --window-size=600 --max-point-dist=2.0 --min-points-no=20 --min-word-prob=0.3 --min-word-len=5 --min-correlation=0.9999 --min-words-sim=0.6 --out-time-offset=-0.08 sync --out SUBTITLE -s SUBTITLE --sub-lang=eng --sub-enc=utf-8 -r REF_FILE --ref-stream-by-type=audio --ref-stream-by-lang=eng
+
+"""
+
+
 registry.register(CommonFixes)
 registry.register(RemoveTags)
 registry.register(ReverseRTL)
